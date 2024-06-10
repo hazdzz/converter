@@ -58,7 +58,7 @@ config = {
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "chsyconv_drop_prob": 0.0,
-        "bffn_drop_prob": 0.0,
+        "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
         "weight_decay": 0.001,
@@ -98,7 +98,7 @@ config = {
         "weight_decay": 0.001,
         "epochs": 50,
         "optimizer": "sophia",
-        "patience": 5,
+        "patience": 2,
         "criteria": 76
     },
     "text":{
@@ -125,14 +125,14 @@ config = {
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
-        "chsyconv_drop_prob": 0.1,
+        "chsyconv_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 20,
         "optimizer": "sophia",
-        "patience": 10,
+        "patience": 2,
         "criteria": 76
     },
     "retrieval":{
@@ -161,13 +161,13 @@ config = {
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "chsyconv_drop_prob": 0.0,
-        "bffn_drop_prob": 0.0,
+        "bffn_drop_prob": 0.1,
         "batch_size": 32,
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 30,
         "optimizer": "sophia",
-        "patience": 10,
+        "patience": 2,
         "criteria": 66
     }
 }

@@ -1,8 +1,4 @@
-import torch
-import torch.distributed as dist
-
 class AverageMeter:
-    """Computes and stores the average and current value"""
     def __init__(self):
         self.reset()
 
@@ -27,11 +23,4 @@ def accuracy(output, target, topk=(1,)):
     correct = pred.eq(target.reshape(1, -1).expand_as(pred))
     accuracies = [correct[:min(k, maxk)].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
     
-    return torch.Tensor(accuracies)
-
-def reduce_tensor(tensor):
-    rt = tensor.clone()
-    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
-    rt /= dist.get_world_size()
-
-    return rt
+    return accuracies

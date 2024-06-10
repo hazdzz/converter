@@ -24,8 +24,6 @@ class Eigenvalue(nn.Module):
 
     def forward(self, input) -> Tensor:
         input_linear = torch.einsum('bnd,de->bne', input, self.weight_eigenvalue)
-        # input_linear = torch.tanh(input_linear)
-        # input_linear = torch.arctan(input_linear)
         input_linear = torch.sin(input_linear)
         input_linear = self.eigenvalue_dropout(input_linear)
 

@@ -8,10 +8,10 @@ import torch.optim as optim
 
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from lra_config import config
 from model import wrapper
 from utils import lra_dataloader, early_stopping, opt, los, metrices
-from tqdm import tqdm
 
 
 def set_env(seed = 3407) -> None:
@@ -26,6 +26,7 @@ def set_env(seed = 3407) -> None:
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
     torch.use_deterministic_algorithms(True)
+
 
 def get_parameters(dataset_name):
     parser = argparse.ArgumentParser(description=f"Configure the parameters for {dataset_name} task.")
@@ -55,6 +56,7 @@ def get_parameters(dataset_name):
 
     return args, device
 
+
 def prepare_model(args, device):
     torch.autograd.set_detect_anomaly(True)
 
@@ -80,6 +82,7 @@ def prepare_model(args, device):
     scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=3, eta_min=0.0005)
 
     return model, loss_nll, loss_seq_kp, loss_feat_kp, optimizer, scheduler, es
+
 
 def prepare_data(args):
     assert args.dataset_name in ['image', 'text', 'listops', 'pathfinder', 'retrieval', 'path-x']
@@ -189,20 +192,22 @@ def prepare_data(args):
 
     return dataloader_train, dataloader_val, dataloader_test
 
+
 def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):
     for _ in range(1, args.epochs + 1):
         acc_train, loss_train = train(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
         acc_val, loss_val = val(model, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
-        print(f'train acc: {acc_train * 100: .2f}%')
+        print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .2f}')
-        print(f'val acc: {acc_val * 100: .2f}%')
+        print(f'val acc: {acc_val: .2f}%')
         print(f'val loss: {loss_val: .2f}')
 
-        if es.step(loss_val) and acc_val >= float(args.criteria):
-            print('Early stopping.')
+        if es.step(torch.tensor(loss_val)) and acc_val >= float(args.criteria):
+            print('\nEarly stopping.\n')
             break
 
     return loss_train, acc_train, loss_val, acc_val
+
 
 def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
     model.train()
@@ -216,20 +221,21 @@ def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_f
 
         optimizer.zero_grad()
         preds = model(samples)
-        acc_train = metrices.accuracy(preds.squeeze(), targets)
-        loss_train = loss_nll(preds.squeeze(), targets)
-        loss_train.backward()
+        acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
+        loss = loss_nll(preds.squeeze(), targets)
+        loss.backward()
         optimizer.step()
         # scheduler.step()
 
-        acc_meter.update(acc_train.item(), targets.size(0))
-        loss_meter.update(loss_train.item(), targets.size(0))
+        acc_meter.update(acc.item(), targets.size(0))
+        loss_meter.update(loss.item(), targets.size(0))
 
     return acc_meter.avg, loss_meter.avg
+
 
 @torch.no_grad()
 def val(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
-    model.train()
+    model.eval()
 
     loss_meter = metrices.AverageMeter()
     acc_meter = metrices.AverageMeter()
@@ -238,19 +244,19 @@ def val(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
         samples = samples.to(device)
         targets = targets.to(device)
 
-        optimizer.zero_grad()
         preds = model(samples)
-        acc_train = metrices.accuracy(preds.squeeze(), targets)
-        loss_train = loss_nll(preds.squeeze(), targets)
+        acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
+        loss = loss_nll(preds.squeeze(), targets)
 
-        acc_meter.update(acc_train.item(), targets.size(0))
-        loss_meter.update(loss_train.item(), targets.size(0))
+        acc_meter.update(acc.item(), targets.size(0))
+        loss_meter.update(loss.item(), targets.size(0))
 
     return acc_meter.avg, loss_meter.avg
+
 
 @torch.no_grad()
 def test(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
-    model.train()
+    model.eval()
 
     loss_meter = metrices.AverageMeter()
     acc_meter = metrices.AverageMeter()
@@ -259,21 +265,15 @@ def test(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
         samples = samples.to(device)
         targets = targets.to(device)
 
-        optimizer.zero_grad()
         preds = model(samples)
-        acc_train = metrices.accuracy(preds.squeeze(), targets)
-        loss_train = loss_nll(preds.squeeze(), targets)
+        acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
+        loss = loss_nll(preds.squeeze(), targets)
 
-        acc_meter.update(acc_train.item(), targets.size(0))
-        loss_meter.update(loss_train.item(), targets.size(0))
+        acc_meter.update(acc.item(), targets.size(0))
+        loss_meter.update(loss.item(), targets.size(0))
 
     return acc_meter.avg, loss_meter.avg
 
-def calc_correct(out, label):
-    preds = out.argmax(dim=-1)
-    correct = preds.eq(label).sum().item()
-
-    return correct
 
 if __name__ == '__main__':
     SEED = 3407
@@ -285,5 +285,5 @@ if __name__ == '__main__':
     loss_train, acc_train, loss_val, acc_val = run(args, model, optimizer, scheduler, es, dataloader_train, dataloader_val, loss_nll, loss_seq_kp, loss_feat_kp, device)
     loss_test, acc_test = test(model, dataloader_test, loss_nll, loss_seq_kp, loss_feat_kp, device)
 
-    print(f'test acc: {acc_test * 100: .2f}%')
+    print(f'test acc: {acc_test: .2f}%')
     print(f'test loss: {loss_test: .2f}')
