@@ -1,20 +1,17 @@
 import os
 import argparse
 import random
-import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from torch.optim.lr_scheduler import CosineAnnealingLR
-# from torchvision import transforms
 from torch.utils.data import DataLoader
-# from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 from lra_config import config
 from model import wrapper
-from utility import lra_dataloader, early_stopping, opt, los
+from utils import lra_dataloader, early_stopping, opt, los, metrices
+from tqdm import tqdm
 
 
 def set_env(seed = 3407) -> None:
@@ -23,7 +20,6 @@ def set_env(seed = 3407) -> None:
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
-    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -66,8 +62,9 @@ def prepare_model(args, device):
 
     loss_nll = nn.NLLLoss()
     loss_seq_kp = los.KernelPolynomialLoss(batch_size = args.batch_size, max_order = args.max_order)
+    loss_feat_kp = los.KernelPolynomialLoss(batch_size = args.batch_size, max_order = args.max_order)
 
-    # es = early_stopping.EarlyStopping(mode='min', min_delta=0.0, patience=args.patience)
+    es = early_stopping.EarlyStopping(mode='min', min_delta=0.0, patience=args.patience)
     
     if args.optimizer == 'adamw':
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -80,11 +77,13 @@ def prepare_model(args, device):
     else:
         raise ValueError(f'ERROR: The {args.optimizer} optimizer is undefined.')
     
-    scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=3, eta_min=0.002)
+    scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=3, eta_min=0.0005)
 
-    return model, loss_nll, loss_seq_kp, optimizer, scheduler
+    return model, loss_nll, loss_seq_kp, loss_feat_kp, optimizer, scheduler, es
 
 def prepare_data(args):
+    assert args.dataset_name in ['image', 'text', 'listops', 'pathfinder', 'retrieval', 'path-x']
+
     if args.dataset_name == 'image':
         data_train = torch.load('./data/lra/image/image_train.pt').to(torch.int32)
         target_train = torch.load('./data/lra/image/image_train_target.pt').to(torch.int32)
@@ -121,173 +120,154 @@ def prepare_data(args):
 
         data_test = torch.load('./data/lra/pathfinder/pathfinder_test.pt').to(torch.int32)
         target_test = torch.load('./data/lra/pathfinder/pathfinder_test_target.pt').to(torch.int32)
-    # elif args.dataset_name == 'retrieval':
-    #     data_train = torch.load('./data/lra/retrieval/retrieval_train.pt').to(torch.int32)
-    #     target_train = torch.load('./data/lra/retrieval/retrieval_train_target.pt').to(torch.int32)
+    elif args.dataset_name == 'retrieval':
+        data_train = torch.load('./data/lra/retrieval/retrieval_train.pt').to(torch.int32)
+        target_train = torch.load('./data/lra/retrieval/retrieval_train_target.pt').to(torch.int32)
 
-    #     data_val = torch.load('./data/lra/retrieval/retrieval_val.pt').to(torch.int32)
-    #     target_val = torch.load('./data/lra/retrieval/retrieval_val_target.pt').to(torch.int32)
+        data_val = torch.load('./data/lra/retrieval/retrieval_val.pt').to(torch.int32)
+        target_val = torch.load('./data/lra/retrieval/retrieval_val_target.pt').to(torch.int32)
 
-    #     data_test = torch.load('./data/lra/retrieval/retrieval_test.pt').to(torch.int32)
-    #     target_test = torch.load('./data/lra/retrieval/retrieval_test_target.pt').to(torch.int32)
-    # else:
-    #     data_train = torch.load('./data/lra/path-x/path-x_train.pt').to(torch.int32)
-    #     target_train = torch.load('./data/lra/path-x/path-x_train_target.pt').to(torch.int32)
+        data_test = torch.load('./data/lra/retrieval/retrieval_test.pt').to(torch.int32)
+        target_test = torch.load('./data/lra/retrieval/retrieval_test_target.pt').to(torch.int32)
+    else:
+        data_train = torch.load('./data/lra/path-x/path-x_train.pt').to(torch.int32)
+        target_train = torch.load('./data/lra/path-x/path-x_train_target.pt').to(torch.int32)
 
-    #     data_val = torch.load('./data/lra/path-x/path-x_val.pt').to(torch.int32)
-    #     target_val = torch.load('./data/lra/path-x/path-x_val_target.pt').to(torch.int32)
+        data_val = torch.load('./data/lra/path-x/path-x_val.pt').to(torch.int32)
+        target_val = torch.load('./data/lra/path-x/path-x_val_target.pt').to(torch.int32)
 
-    #     data_test = torch.load('./data/lra/path-x/path-x_test.pt').to(torch.int32)
-    #     target_test = torch.load('./data/lra/path-x/path-x_test_target.pt').to(torch.int32)
+        data_test = torch.load('./data/lra/path-x/path-x_test.pt').to(torch.int32)
+        target_test = torch.load('./data/lra/path-x/path-x_test_target.pt').to(torch.int32)
 
     if args.pooling_type == 'CLS':
         cls_token_data_train = torch.tensor([[args.vocab_size - 1] * data_train.size(0)]).T
         cls_token_data_val = torch.tensor([[args.vocab_size - 1] * data_val.size(0)]).T
         cls_token_data_test = torch.tensor([[args.vocab_size - 1] * data_test.size(0)]).T
 
-        data_train = torch.cat([cls_token_data_train, data_train], -1)
-        data_val = torch.cat([cls_token_data_val, data_val], -1)
-        data_test = torch.cat([cls_token_data_test, data_test], -1)
+        data_train = torch.cat([cls_token_data_train, data_train], dim=-1)
+        data_val = torch.cat([cls_token_data_val, data_val], dim=-1)
+        data_test = torch.cat([cls_token_data_test, data_test], dim=-1)
 
-    train_set = lra_dataloader.DatasetCreator(
+    dataset_train = lra_dataloader.DatasetCreator(
         data = data_train,
         labels = target_train        
     )
 
-    train_loader = DataLoader(
-        dataset = train_set,
+    dataset_val = lra_dataloader.DatasetCreator(
+        data = data_val,
+        labels = target_val
+    )
+
+    dataset_test = lra_dataloader.DatasetCreator(
+        data = data_test,
+        labels = target_test
+    )
+
+    dataloader_train = DataLoader(
+        dataset = dataset_train,
         batch_size = args.batch_size,
         shuffle = True,
         drop_last = True,
         num_workers = 1
     )
 
-    val_set = lra_dataloader.DatasetCreator(
-        data = data_val,
-        labels = target_val
-    )
-
-    val_loader = DataLoader(
-        dataset = val_set,
+    dataloader_val = DataLoader(
+        dataset = dataset_val,
         batch_size = args.batch_size,
         shuffle = False,
         drop_last = True,
         num_workers = 1
     )
 
-    test_set = lra_dataloader.DatasetCreator(
-        data = data_test,
-        labels = target_test
-    )
-
-    test_loader = DataLoader(
-        dataset = test_set,
+    dataloader_test = DataLoader(
+        dataset = dataset_test,
         batch_size = args.batch_size,
         shuffle = False,
         drop_last = True,
         num_workers = 1
     )
 
-    return train_loader, val_loader, test_loader
+    return dataloader_train, dataloader_val, dataloader_test
 
-def run(args, model, optimizer, scheduler, train_loader, val_loader, loss_nll, loss_seq_kp, device):
+def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):
     for _ in range(1, args.epochs + 1):
-        loss_train, acc_train = train(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
-        loss_val, acc_val = val(model, val_loader, loss_nll, loss_seq_kp, device)
+        acc_train, loss_train = train(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
+        acc_val, loss_val = val(model, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
         print(f'train acc: {acc_train * 100: .2f}%')
         print(f'train loss: {loss_train: .2f}')
         print(f'val acc: {acc_val * 100: .2f}%')
         print(f'val loss: {loss_val: .2f}')
 
+        if es.step(loss_val) and acc_val >= float(args.criteria):
+            print('Early stopping.')
+            break
+
     return loss_train, acc_train, loss_val, acc_val
 
-def train(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device):
+def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
     model.train()
-    total_loss = 0
-    total_correct = 0
-    total_samples = 0
 
-    with tqdm(train_loader, unit="batch") as ttrain:
-        ttrain.set_description("Training")
+    acc_meter = metrices.AverageMeter()
+    loss_meter = metrices.AverageMeter()
 
-        for batch in ttrain:
-            data_train, target_train = batch
-            data_train, target_train = data_train.to(device), target_train.to(device)
-            
-            optimizer.zero_grad()
-            train_out = model(data_train)
-            loss_train = loss_nll(train_out.squeeze(), target_train)
-            # loss_train = loss_nll(train_out.squeeze(), target_train) + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.gibbs_damp)
-            loss_train.backward()
-            optimizer.step()
-            # scheduler.step()
+    for _, (samples, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        samples = samples.to(device)
+        targets = targets.to(device)
 
-            total_loss += loss_train.item() * data_train.size(0)
-            total_correct += calc_correct(train_out, target_train)
-            total_samples += data_train.size(0)
+        optimizer.zero_grad()
+        preds = model(samples)
+        acc_train = metrices.accuracy(preds.squeeze(), targets)
+        loss_train = loss_nll(preds.squeeze(), targets)
+        loss_train.backward()
+        optimizer.step()
+        # scheduler.step()
 
-            ttrain.set_postfix(loss=loss_train.item())
+        acc_meter.update(acc_train.item(), targets.size(0))
+        loss_meter.update(loss_train.item(), targets.size(0))
 
-    avg_loss = total_loss / total_samples
-    accuracy = total_correct / total_samples
-
-    return avg_loss, accuracy
+    return acc_meter.avg, loss_meter.avg
 
 @torch.no_grad()
-def val(model, val_loader, loss_nll, loss_seq_kp, device):
-    model.eval()
-    total_loss = 0
-    total_correct = 0
-    total_samples = 0
+def val(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+    model.train()
 
-    with tqdm(val_loader, unit="batch") as tval:
-        tval.set_description("Validation")
+    loss_meter = metrices.AverageMeter()
+    acc_meter = metrices.AverageMeter()
 
-        for batch in tval:
-            data_val, target_val = batch
-            data_val, target_val = data_val.to(device), target_val.to(device)
+    for _, (samples, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        samples = samples.to(device)
+        targets = targets.to(device)
 
-            val_out = model(data_val)
-            loss_val = loss_nll(val_out.squeeze(), target_val)
-            # loss_val = loss_nll(val_out.squeeze(), target_val) + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.gibbs_damp)
-            total_loss += loss_val.item() * data_val.size(0)
-            total_correct += calc_correct(val_out, target_val)
-            total_samples += data_val.size(0)
+        optimizer.zero_grad()
+        preds = model(samples)
+        acc_train = metrices.accuracy(preds.squeeze(), targets)
+        loss_train = loss_nll(preds.squeeze(), targets)
 
-            tval.set_postfix(loss=loss_val.item())
+        acc_meter.update(acc_train.item(), targets.size(0))
+        loss_meter.update(loss_train.item(), targets.size(0))
 
-    avg_loss = total_loss / total_samples
-    accuracy = total_correct / total_samples
-    
-    return avg_loss, accuracy
+    return acc_meter.avg, loss_meter.avg
 
 @torch.no_grad()
-def test(model, test_loader, loss_nll, loss_seq_kp, device):
-    model.eval()
-    total_loss = 0
-    total_correct = 0
-    total_samples = 0
+def test(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+    model.train()
 
-    with tqdm(test_loader, unit="batch") as ttest:
-        ttest.set_description("Testing")
+    loss_meter = metrices.AverageMeter()
+    acc_meter = metrices.AverageMeter()
 
-        for batch in ttest:
-            data_test, target_test = batch
-            data_test, target_test = data_test.to(device), target_test.to(device)
+    for _, (samples, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        samples = samples.to(device)
+        targets = targets.to(device)
 
-            test_out = model(data_test)
-            loss_test = loss_nll(test_out.squeeze(), target_test)
-            # loss_test = loss_nll(test_out.squeeze(), target_test) + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.gibbs_damp)
-            total_loss += loss_test.item() * data_test.size(0)
-            total_correct += calc_correct(test_out, target_test)
-            total_samples += data_test.size(0)
+        optimizer.zero_grad()
+        preds = model(samples)
+        acc_train = metrices.accuracy(preds.squeeze(), targets)
+        loss_train = loss_nll(preds.squeeze(), targets)
 
-            ttest.set_postfix(loss=loss_test.item())
+        acc_meter.update(acc_train.item(), targets.size(0))
+        loss_meter.update(loss_train.item(), targets.size(0))
 
-    avg_loss = total_loss / total_samples
-    accuracy = total_correct / total_samples
-
-    return avg_loss, accuracy
+    return acc_meter.avg, loss_meter.avg
 
 def calc_correct(out, label):
     preds = out.argmax(dim=-1)
@@ -299,11 +279,11 @@ if __name__ == '__main__':
     SEED = 3407
     set_env(SEED)
 
-    args, device = get_parameters("text")
-    model, loss_nll, loss_seq_kp, optimizer, scheduler = prepare_model(args, device)
-    train_loader, val_loader, test_loader = prepare_data(args)
-    loss_train, acc_train, loss_val, acc_val = run(args, model, optimizer, scheduler, train_loader, val_loader, loss_nll, loss_seq_kp, device)
-    loss_test, acc_test = test(model, test_loader, loss_nll, loss_seq_kp, device)
+    args, device = get_parameters("image")
+    model, loss_nll, loss_seq_kp, loss_feat_kp, optimizer, scheduler, es = prepare_model(args, device)
+    dataloader_train, dataloader_val, dataloader_test = prepare_data(args)
+    loss_train, acc_train, loss_val, acc_val = run(args, model, optimizer, scheduler, es, dataloader_train, dataloader_val, loss_nll, loss_seq_kp, loss_feat_kp, device)
+    loss_test, acc_test = test(model, dataloader_test, loss_nll, loss_seq_kp, loss_feat_kp, device)
 
     print(f'test acc: {acc_test * 100: .2f}%')
     print(f'test loss: {loss_test: .2f}')

@@ -23,13 +23,15 @@ config = {
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
-        "bffn_drop_prob": 0.0,
-        "batch_size": 32,
+        "chsyconv_drop_prob": 0.0,
+        "bffn_drop_prob": 0.1,
+        "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.001,
-        "epochs": 30, # 30 for 39.26%
+        "weight_decay": 0.0001,
+        "epochs": 20, # 30 for 39.26%
         "optimizer": "sophia",
-        "patience": 2
+        "patience": 2,
+        "criteria": 39
     },
     "image":{
         "pe_type": "cpe",
@@ -55,13 +57,15 @@ config = {
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
-        "bffn_drop_prob": 0.1,
-        "batch_size": 32,
+        "chsyconv_drop_prob": 0.0,
+        "bffn_drop_prob": 0.0,
+        "batch_size": 64,
         "lr": 0.001,
         "weight_decay": 0.001,
-        "epochs": 10,
+        "epochs": 15,
         "optimizer": "sophia",
-        "patience": 2
+        "patience": 2,
+        "criteria": 46
     },
     "pathfinder":{
         "pe_type": "cpe",
@@ -87,13 +91,15 @@ config = {
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
+        "chsyconv_drop_prob": 0.0,
         "bffn_drop_prob": 0.0,
         "batch_size": 64,
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 50,
         "optimizer": "sophia",
-        "patience": 5
+        "patience": 5,
+        "criteria": 76
     },
     "text":{
         "pe_type": "cpe",
@@ -107,7 +113,7 @@ config = {
         "xi": 4.0,
         "stigma": 0.5,
         "heta": 2,
-        "hid_dim": 64 * 4,
+        "hid_dim": 64,
         "dataset_name": "text",
         "pooling_type": "CLS", # "CLS", "MEAN", "SUM", or "FLATTEN"
         "encoder_dim": 64,
@@ -119,13 +125,15 @@ config = {
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
+        "chsyconv_drop_prob": 0.1,
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
-        "lr": 0.0005,
-        "weight_decay": 0.0005,
-        "epochs": 30,
+        "lr": 0.001,
+        "weight_decay": 0.001,
+        "epochs": 20,
         "optimizer": "sophia",
-        "patience": 10
+        "patience": 10,
+        "criteria": 76
     },
     "retrieval":{
         "pe_type": "cpe",
@@ -149,15 +157,17 @@ config = {
         "interaction": "NLI",
         "enable_cuda": True,
         "device_id": 0,
-        "embed_drop_prob": 0.0,
-        "eigenvalue_drop_prob": 0.1,
-        "value_drop_prob": 0.1,
+        "embed_drop_prob": 0.1,
+        "eigenvalue_drop_prob": 0.0,
+        "value_drop_prob": 0.0,
+        "chsyconv_drop_prob": 0.0,
         "bffn_drop_prob": 0.0,
         "batch_size": 32,
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 30,
         "optimizer": "sophia",
-        "patience": 10
+        "patience": 10,
+        "criteria": 66
     }
 }

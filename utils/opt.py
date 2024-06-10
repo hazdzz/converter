@@ -7,10 +7,12 @@ import math
 import torch
 from packaging import version
 from torch import Tensor
-from torch.optim.optimizer import Optimizer, ParamsT
+from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import LambdaLR
-# from torch.utils.tensorboard import SummaryWriter
-from typing import List, Union, Optional
+from typing import Any, Iterable, Dict, List, Union, Optional, TypeAlias
+
+
+ParamsT: TypeAlias = Union[Iterable[torch.Tensor], Iterable[Dict[str, Any]]]
 
 
 ops = {
@@ -469,7 +471,7 @@ class Tiger(Optimizer):
 
     def __init__(
         self, 
-        params: ParamsT, 
+        params: ParamsT,
         lr: Union[float, Tensor] = 1e-3, 
         beta: float = 0.965, 
         weight_decay: float = 1e-2):

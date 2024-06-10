@@ -20,11 +20,9 @@ class KernelPolynomialLoss(nn.Module):
         order = torch.arange(0, self.max_order + 1, device=cheb_coef.device)
 
         if self.enable_simplified:
-            loss = torch.sum(torch.pow(cheb_coef, 2) * torch.pow(order, 2) \
-                             / math.pow(self.max_order + 1, 2))
+            loss = torch.sum(cheb_coef.pow(2) * order.pow(2) / math.pow(self.max_order + 1, 2))
         else:
-            loss = torch.sum(torch.pow(cheb_coef, 2) * torch.pow(order, 2) \
-                             * math.pi * self.eta)
+            loss = torch.sum(cheb_coef.pow(2) * order.pow(2) * math.pi * self.eta)
         
         if self.batch_size > 1:
             loss = loss / self.batch_size

@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import utility.functional as cF
+import utils.functional as cF
 
 
 Tensor = torch.Tensor
