@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+import torch.nn.functional as F
 from utils import dropout
 from torch import Tensor
 
@@ -138,7 +139,7 @@ class KernelPolynomial(nn.Module):
 
 class ChsyConv2D(nn.Module):
     def __init__(self, batch_size, length, feat_dim, 
-                 eigenvalue_drop_prob, chsyconv_drop_prob,  
+                 eigenvalue_drop_prob, chsyconv_drop_prob, 
                  kernel_type, max_order, mu, xi, stigma, heta) -> None:
         super(ChsyConv2D, self).__init__()
         seq_pool_dim = 2

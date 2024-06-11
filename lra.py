@@ -58,9 +58,10 @@ def get_parameters(dataset_name):
 
 
 def prepare_model(args, device):
-    torch.autograd.set_detect_anomaly(True)
-
-    model = wrapper.ConverterLRASingle(args).to(device)
+    if args.dataset_name == 'retrieval':
+        model = wrapper.ConverterLRADual(args).to(device)
+    else:
+        model = wrapper.ConverterLRASingle(args).to(device)
 
     loss_nll = nn.NLLLoss()
     loss_seq_kp = los.KernelPolynomialLoss(batch_size = args.batch_size, max_order = args.max_order)
@@ -70,6 +71,8 @@ def prepare_model(args, device):
     
     if args.optimizer == 'adamw':
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'adafactor':
+        optimizer = opt.Adafactor(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'lion':
         optimizer = opt.Lion(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'tiger':
@@ -85,7 +88,7 @@ def prepare_model(args, device):
 
 
 def prepare_data(args):
-    assert args.dataset_name in ['image', 'text', 'listops', 'pathfinder', 'retrieval', 'path-x']
+    assert args.dataset_name in ['image', 'text', 'listops', 'pathfinder', 'path-x']
 
     if args.dataset_name == 'image':
         data_train = torch.load('./data/lra/image/image_train.pt').to(torch.int32)
@@ -123,15 +126,6 @@ def prepare_data(args):
 
         data_test = torch.load('./data/lra/pathfinder/pathfinder_test.pt').to(torch.int32)
         target_test = torch.load('./data/lra/pathfinder/pathfinder_test_target.pt').to(torch.int32)
-    elif args.dataset_name == 'retrieval':
-        data_train = torch.load('./data/lra/retrieval/retrieval_train.pt').to(torch.int32)
-        target_train = torch.load('./data/lra/retrieval/retrieval_train_target.pt').to(torch.int32)
-
-        data_val = torch.load('./data/lra/retrieval/retrieval_val.pt').to(torch.int32)
-        target_val = torch.load('./data/lra/retrieval/retrieval_val_target.pt').to(torch.int32)
-
-        data_test = torch.load('./data/lra/retrieval/retrieval_test.pt').to(torch.int32)
-        target_test = torch.load('./data/lra/retrieval/retrieval_test_target.pt').to(torch.int32)
     else:
         data_train = torch.load('./data/lra/path-x/path-x_train.pt').to(torch.int32)
         target_train = torch.load('./data/lra/path-x/path-x_train_target.pt').to(torch.int32)
@@ -151,18 +145,93 @@ def prepare_data(args):
         data_val = torch.cat([cls_token_data_val, data_val], dim=-1)
         data_test = torch.cat([cls_token_data_test, data_test], dim=-1)
 
-    dataset_train = lra_dataloader.DatasetCreator(
+    dataset_train = lra_dataloader.SingleDatasetCreator(
         data = data_train,
         labels = target_train        
     )
 
-    dataset_val = lra_dataloader.DatasetCreator(
+    dataset_val = lra_dataloader.SingleDatasetCreator(
         data = data_val,
         labels = target_val
     )
 
-    dataset_test = lra_dataloader.DatasetCreator(
+    dataset_test = lra_dataloader.SingleDatasetCreator(
         data = data_test,
+        labels = target_test
+    )
+
+    dataloader_train = DataLoader(
+        dataset = dataset_train,
+        batch_size = args.batch_size,
+        shuffle = True,
+        drop_last = True,
+        num_workers = 1
+    )
+
+    dataloader_val = DataLoader(
+        dataset = dataset_val,
+        batch_size = args.batch_size,
+        shuffle = False,
+        drop_last = True,
+        num_workers = 1
+    )
+
+    dataloader_test = DataLoader(
+        dataset = dataset_test,
+        batch_size = args.batch_size,
+        shuffle = False,
+        drop_last = True,
+        num_workers = 1
+    )
+
+    return dataloader_train, dataloader_val, dataloader_test
+
+
+def prepare_data_retrieval(args):
+    data_train_1 = torch.load('./data/lra/retrieval/retrieval_train_1.pt').to(torch.int32)
+    data_train_2 = torch.load('./data/lra/retrieval/retrieval_train_2.pt').to(torch.int32)
+    target_train = torch.load('./data/lra/retrieval/retrieval_train_target.pt').to(torch.int32)
+
+    data_val_1 = torch.load('./data/lra/retrieval/retrieval_val_1.pt').to(torch.int32)
+    data_val_2 = torch.load('./data/lra/retrieval/retrieval_val_2.pt').to(torch.int32)
+    target_val = torch.load('./data/lra/retrieval/retrieval_val_target.pt').to(torch.int32)
+
+    data_test_1 = torch.load('./data/lra/retrieval/retrieval_test_1.pt').to(torch.int32)
+    data_test_2 = torch.load('./data/lra/retrieval/retrieval_test_2.pt').to(torch.int32)
+    target_test = torch.load('./data/lra/retrieval/retrieval_test_target.pt').to(torch.int32)
+
+    if args.pooling_type == 'CLS':
+        cls_token_data_train_1 = torch.tensor([[args.vocab_size - 1] * data_train_1.size(0)]).T
+        cls_token_data_val_1 = torch.tensor([[args.vocab_size - 1] * data_val_1.size(0)]).T
+        cls_token_data_test_1 = torch.tensor([[args.vocab_size - 1] * data_test_1.size(0)]).T
+
+        cls_token_data_train_2 = torch.tensor([[args.vocab_size - 1] * data_train_2.size(0)]).T
+        cls_token_data_val_2 = torch.tensor([[args.vocab_size - 1] * data_val_2.size(0)]).T
+        cls_token_data_test_2 = torch.tensor([[args.vocab_size - 1] * data_test_2.size(0)]).T
+
+        data_train_1 = torch.cat([cls_token_data_train_1, data_train_1], dim=-1)
+        data_val_1 = torch.cat([cls_token_data_val_1, data_val_1], dim=-1)
+        data_test_1 = torch.cat([cls_token_data_test_1, data_test_1], dim=-1)
+
+        data_train_2 = torch.cat([cls_token_data_train_2, data_train_2], dim=-1)
+        data_val_2 = torch.cat([cls_token_data_val_2, data_val_2], dim=-1)
+        data_test_2 = torch.cat([cls_token_data_test_2, data_test_2], dim=-1)
+
+    dataset_train = lra_dataloader.DualDatasetCreator(
+        data1 = data_train_1,
+        data2 = data_train_2,
+        labels = target_train        
+    )
+
+    dataset_val = lra_dataloader.DualDatasetCreator(
+        data1 = data_val_1,
+        data2 = data_val_2,
+        labels = target_val
+    )
+
+    dataset_test = lra_dataloader.DualDatasetCreator(
+        data1 = data_test_1,
+        data2 = data_test_2,
         labels = target_test
     )
 
@@ -225,10 +294,11 @@ def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_f
         loss = loss_nll(preds.squeeze(), targets)
         loss.backward()
         optimizer.step()
-        # scheduler.step()
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
+
+    # scheduler.step()
 
     return acc_meter.avg, loss_meter.avg
 
@@ -275,15 +345,128 @@ def test(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
     return acc_meter.avg, loss_meter.avg
 
 
+def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+    for _ in range(1, args.epochs + 1):
+        acc_train, loss_train = train_retrieval(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
+        acc_val, loss_val = val_retrieval(model, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
+        print(f'train acc: {acc_train: .2f}%')
+        print(f'train loss: {loss_train: .2f}')
+        print(f'val acc: {acc_val: .2f}%')
+        print(f'val loss: {loss_val: .2f}')
+
+        if es.step(torch.tensor(loss_val)) and acc_val >= float(args.criteria):
+            print('\nEarly stopping.\n')
+            break
+
+    return loss_train, acc_train, loss_val, acc_val
+
+
+def train_retrieval(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+    model.train()
+
+    acc_meter = metrices.AverageMeter()
+    loss_meter = metrices.AverageMeter()
+
+    for _, (samples_1, samples_2, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        samples_1 = samples_1.to(device)
+        samples_2 = samples_2.to(device)
+        targets = targets.to(device)
+
+        optimizer.zero_grad()
+        preds = model(samples_1, samples_2)
+        acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
+        loss = loss_nll(preds.squeeze(), targets)
+        loss.backward()
+        optimizer.step()
+
+        acc_meter.update(acc.item(), targets.size(0))
+        loss_meter.update(loss.item(), targets.size(0))
+
+    # scheduler.step()
+
+    return acc_meter.avg, loss_meter.avg
+
+
+@torch.no_grad()
+def val_retrieval(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+    model.eval()
+
+    loss_meter = metrices.AverageMeter()
+    acc_meter = metrices.AverageMeter()
+
+    for _, (samples_1, samples_2, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        samples_1 = samples_1.to(device)
+        samples_2 = samples_2.to(device)
+        targets = targets.to(device)
+
+        preds = model(samples_1, samples_2)
+        acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
+        loss = loss_nll(preds.squeeze(), targets)
+
+        acc_meter.update(acc.item(), targets.size(0))
+        loss_meter.update(loss.item(), targets.size(0))
+
+    return acc_meter.avg, loss_meter.avg
+
+
+@torch.no_grad()
+def test_retrieval(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+    model.eval()
+
+    loss_meter = metrices.AverageMeter()
+    acc_meter = metrices.AverageMeter()
+
+    for _, (samples_1, samples_2, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        samples_1 = samples_1.to(device)
+        samples_2 = samples_2.to(device)
+        targets = targets.to(device)
+
+        preds = model(samples_1, samples_2)
+        acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
+        loss = loss_nll(preds.squeeze(), targets)
+
+        acc_meter.update(acc.item(), targets.size(0))
+        loss_meter.update(loss.item(), targets.size(0))
+
+    return acc_meter.avg, loss_meter.avg
+
+
 if __name__ == '__main__':
     SEED = 3407
     set_env(SEED)
 
-    args, device = get_parameters("image")
+    args, device = get_parameters('retrieval')
     model, loss_nll, loss_seq_kp, loss_feat_kp, optimizer, scheduler, es = prepare_model(args, device)
-    dataloader_train, dataloader_val, dataloader_test = prepare_data(args)
-    loss_train, acc_train, loss_val, acc_val = run(args, model, optimizer, scheduler, es, dataloader_train, dataloader_val, loss_nll, loss_seq_kp, loss_feat_kp, device)
-    loss_test, acc_test = test(model, dataloader_test, loss_nll, loss_seq_kp, loss_feat_kp, device)
+    if args.dataset_name == 'retrieval':
+        dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)
+        loss_train, acc_train, loss_val, acc_val = run_retrieval(args, 
+                                                                 model, 
+                                                                 optimizer, 
+                                                                 scheduler, 
+                                                                 es, 
+                                                                 dataloader_train, 
+                                                                 dataloader_val, 
+                                                                 loss_nll, 
+                                                                 loss_seq_kp, 
+                                                                 loss_feat_kp, 
+                                                                 device
+                                                                )
+        loss_test, acc_test = test_retrieval(model, dataloader_test, 
+                                             loss_nll, loss_seq_kp, 
+                                             loss_feat_kp, device
+                                            )
+    else:
+        dataloader_train, dataloader_val, dataloader_test = prepare_data(args)
+        loss_train, acc_train, loss_val, acc_val = run(args, model, 
+                                                       optimizer, scheduler, 
+                                                       es, dataloader_train, 
+                                                       dataloader_val, loss_nll, 
+                                                       loss_seq_kp, loss_feat_kp, 
+                                                       device
+                                                    )
+        loss_test, acc_test = test(model, dataloader_test, loss_nll, 
+                                   loss_seq_kp, loss_feat_kp, device
+                                )
 
     print(f'test acc: {acc_test: .2f}%')
     print(f'test loss: {loss_test: .2f}')

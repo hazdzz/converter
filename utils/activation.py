@@ -1,12 +1,10 @@
-from typing import Callable, List, Optional, Tuple
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import utils.functional as cF
-
-
-Tensor = torch.Tensor
+from typing import Callable, List, Optional, Tuple
+from torch import Tensor
 
 class dSiLU(nn.Module):
     def forward(self, input: Tensor) -> Tensor:

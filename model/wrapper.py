@@ -60,6 +60,9 @@ class DualClassifier(nn.Module):
         super(DualClassifier, self).__init__()
         self.pooling_type = pooling_type
         self.interaction = interaction
+        self.max_seq_len = max_seq_len
+        self.encoder_dim = encoder_dim
+        self.mlp_dim = mlp_dim
         self.linear1 = nn.Linear(encoder_dim * 2, mlp_dim)
         self.nli_linear1 = nn.Linear(encoder_dim * 4, mlp_dim)
         self.flatten_linear1 = nn.Linear(max_seq_len * encoder_dim * 2, mlp_dim)
@@ -71,11 +74,11 @@ class DualClassifier(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.kaiming_normal_(self.linear1.weight, nonlinearity='relu')
-        init.kaiming_normal_(self.nli_linear1.weight, nonlinearity='relu')
-        init.kaiming_normal_(self.flatten_linear1.weight, nonlinearity='relu')
-        init.kaiming_normal_(self.flatten_nli_linear1.weight, nonlinearity='relu')
-        init.xavier_uniform_(self.linear2.weight)
+        init.normal_(self.linear1.weight, mean=0, std=1 / (self.encoder_dim * 2))
+        init.normal_(self.nli_linear1.weight, mean=0, std=1 / (self.encoder_dim * 4))
+        init.normal_(self.flatten_linear1.weight, mean=0, std=1 / (self.max_seq_len * self.encoder_dim * 2))
+        init.normal_(self.flatten_nli_linear1.weight, mean=0, std=1 / (self.max_seq_len * self.encoder_dim * 4))
+        init.normal_(self.linear2.weight, mean=0, std=1 / self.mlp_dim)
 
     def pooling(self, input, mode):
         if mode == 'CLS':
@@ -142,7 +145,8 @@ class ConverterLRADual(nn.Module):
                                          args.max_seq_len, 
                                          args.encoder_dim, 
                                          args.mlp_dim, 
-                                         args.num_class
+                                         args.num_class,
+                                         args.interaction
                                          )
 
     def forward(self, input1, input2) -> Tensor:

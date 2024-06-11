@@ -4,31 +4,6 @@ import torch.nn.init as init
 from torch import Tensor
 
 
-class FFN(nn.Module):
-    def __init__(self, feat_dim, hid_dim, ffn_drop_prob) -> None:
-        super(FFN, self).__init__()
-        self.feat_dim = feat_dim
-        self.hid_dim = hid_dim # hid_dim >= feat_dim
-        self.key = nn.Parameter(torch.empty((feat_dim, hid_dim)))
-        self.value_trs = nn.Parameter(torch.empty((hid_dim, feat_dim)))
-        self.gelu = nn.GELU()
-        self.ffn_dropout = nn.Dropout(p=ffn_drop_prob)
-
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        init.normal_(self.key, mean=0, std=1 / self.hid_dim)
-        init.normal_(self.value_trs, mean=0, std=1 / self.hid_dim)
-
-    def forward(self, x) -> Tensor:
-        key = torch.einsum('bnd,de->bne', x, self.key)
-        key = self.gelu(key)
-        key = self.ffn_dropout(key)
-        ffn = torch.einsum('bne,ed->bnd', key, self.value_trs)
-
-        return ffn
-
-
 class BFFN(nn.Module):
     def __init__(self, feat_dim, bffn_drop_prob) -> None:
         super(BFFN, self).__init__()

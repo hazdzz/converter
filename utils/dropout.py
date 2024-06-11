@@ -1,10 +1,7 @@
-from typing import Callable, List, Optional, Tuple
-import math
-import torch
 import torch.nn.functional as F
+import utils.functional as cF
 from torch.nn.modules import Module
 from torch import Tensor
-import utils.functional as cF
 
 
 class _DropoutNd(Module):

@@ -99,7 +99,6 @@ def require_version(requirement: str, hint: Optional[str] = None) -> None:
         for op, want_ver in wanted.items():
             _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)
 
-
 def require_version_core(requirement):
     """require_version wrapper which emits a core-specific hint on failure"""
     hint = "Try: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main"
@@ -345,6 +344,7 @@ class Adafactor(Optimizer):
                     p.copy_(p_data_fp32)
 
         return loss
+    
 
 class AdafactorSchedule(LambdaLR):
     """
@@ -583,7 +583,6 @@ class SophiaG(Optimizer):
 
                 state['hessian'].mul_(beta2).addcmul_(p.grad, p.grad, value=1 - beta2)
 
-
     @torch.no_grad()
     def step(self, closure=None, bs=5120):
         loss = None
@@ -659,7 +658,6 @@ def sophiag(params: List[Tensor],
     if not all(isinstance(t, torch.Tensor) for t in state_steps):
         raise RuntimeError("API has changed, `state_steps` argument must contain a list of singleton tensors")
 
-    
     func = _single_tensor_sophiag
 
     func(params,

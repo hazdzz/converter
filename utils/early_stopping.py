@@ -1,8 +1,9 @@
 import torch
+from torch import Tensor
 
 
 class EarlyStopping(object):
-    def __init__(self, mode='min', min_delta=0, patience=10, percentage=False):
+    def __init__(self, mode='min', min_delta=0, patience=10, percentage=False) -> None:
         self.mode = mode
         self.min_delta = min_delta
         self.patience = patience
@@ -15,7 +16,7 @@ class EarlyStopping(object):
             self.is_better = lambda a, b: True
             self.step = lambda a: False
 
-    def step(self, metrics):
+    def step(self, metrics) -> bool:
         if self.best is None:
             self.best = metrics
             return False
@@ -34,7 +35,7 @@ class EarlyStopping(object):
 
         return False
 
-    def _init_is_better(self, mode, min_delta, percentage):
+    def _init_is_better(self, mode, min_delta, percentage) -> Tensor:
         if mode not in {'min', 'max'}:
             raise ValueError('mode ' + mode + ' is unknown!')
         if not percentage:

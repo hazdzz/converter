@@ -36,7 +36,7 @@ class Converter(nn.Module):
     def forward(self, input) -> Tensor:
         alpha = torch.clamp(self.alpha, min=0.0, max=1.0)
 
-        embed= self.embedding(input)
+        embed = self.embedding(input)
 
         embed_norm = self.embed_norm(embed)
         chsyconv = self.chsyconv2d(embed_norm) + embed
