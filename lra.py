@@ -58,6 +58,8 @@ def get_parameters(dataset_name):
 
 
 def prepare_model(args, device):
+    torch.autograd.set_detect_anomaly(True)
+
     if args.dataset_name == 'retrieval':
         model = wrapper.ConverterLRADual(args).to(device)
     else:
@@ -187,81 +189,6 @@ def prepare_data(args):
     return dataloader_train, dataloader_val, dataloader_test
 
 
-def prepare_data_retrieval(args):
-    data_train_1 = torch.load('./data/lra/retrieval/retrieval_train_1.pt').to(torch.int32)
-    data_train_2 = torch.load('./data/lra/retrieval/retrieval_train_2.pt').to(torch.int32)
-    target_train = torch.load('./data/lra/retrieval/retrieval_train_target.pt').to(torch.int32)
-
-    data_val_1 = torch.load('./data/lra/retrieval/retrieval_val_1.pt').to(torch.int32)
-    data_val_2 = torch.load('./data/lra/retrieval/retrieval_val_2.pt').to(torch.int32)
-    target_val = torch.load('./data/lra/retrieval/retrieval_val_target.pt').to(torch.int32)
-
-    data_test_1 = torch.load('./data/lra/retrieval/retrieval_test_1.pt').to(torch.int32)
-    data_test_2 = torch.load('./data/lra/retrieval/retrieval_test_2.pt').to(torch.int32)
-    target_test = torch.load('./data/lra/retrieval/retrieval_test_target.pt').to(torch.int32)
-
-    if args.pooling_type == 'CLS':
-        cls_token_data_train_1 = torch.tensor([[args.vocab_size - 1] * data_train_1.size(0)]).T
-        cls_token_data_val_1 = torch.tensor([[args.vocab_size - 1] * data_val_1.size(0)]).T
-        cls_token_data_test_1 = torch.tensor([[args.vocab_size - 1] * data_test_1.size(0)]).T
-
-        cls_token_data_train_2 = torch.tensor([[args.vocab_size - 1] * data_train_2.size(0)]).T
-        cls_token_data_val_2 = torch.tensor([[args.vocab_size - 1] * data_val_2.size(0)]).T
-        cls_token_data_test_2 = torch.tensor([[args.vocab_size - 1] * data_test_2.size(0)]).T
-
-        data_train_1 = torch.cat([cls_token_data_train_1, data_train_1], dim=-1)
-        data_val_1 = torch.cat([cls_token_data_val_1, data_val_1], dim=-1)
-        data_test_1 = torch.cat([cls_token_data_test_1, data_test_1], dim=-1)
-
-        data_train_2 = torch.cat([cls_token_data_train_2, data_train_2], dim=-1)
-        data_val_2 = torch.cat([cls_token_data_val_2, data_val_2], dim=-1)
-        data_test_2 = torch.cat([cls_token_data_test_2, data_test_2], dim=-1)
-
-    dataset_train = lra_dataloader.DualDatasetCreator(
-        data1 = data_train_1,
-        data2 = data_train_2,
-        labels = target_train        
-    )
-
-    dataset_val = lra_dataloader.DualDatasetCreator(
-        data1 = data_val_1,
-        data2 = data_val_2,
-        labels = target_val
-    )
-
-    dataset_test = lra_dataloader.DualDatasetCreator(
-        data1 = data_test_1,
-        data2 = data_test_2,
-        labels = target_test
-    )
-
-    dataloader_train = DataLoader(
-        dataset = dataset_train,
-        batch_size = args.batch_size,
-        shuffle = True,
-        drop_last = True,
-        num_workers = 1
-    )
-
-    dataloader_val = DataLoader(
-        dataset = dataset_val,
-        batch_size = args.batch_size,
-        shuffle = False,
-        drop_last = True,
-        num_workers = 1
-    )
-
-    dataloader_test = DataLoader(
-        dataset = dataset_test,
-        batch_size = args.batch_size,
-        shuffle = False,
-        drop_last = True,
-        num_workers = 1
-    )
-
-    return dataloader_train, dataloader_val, dataloader_test
-
-
 def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):
     for _ in range(1, args.epochs + 1):
         acc_train, loss_train = train(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
@@ -343,6 +270,81 @@ def test(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
         loss_meter.update(loss.item(), targets.size(0))
 
     return acc_meter.avg, loss_meter.avg
+
+
+def prepare_data_retrieval(args):
+    data_train_1 = torch.load('./data/lra/retrieval/retrieval_train_1.pt').to(torch.int32)
+    data_train_2 = torch.load('./data/lra/retrieval/retrieval_train_2.pt').to(torch.int32)
+    target_train = torch.load('./data/lra/retrieval/retrieval_train_target.pt').to(torch.int32)
+
+    data_val_1 = torch.load('./data/lra/retrieval/retrieval_val_1.pt').to(torch.int32)
+    data_val_2 = torch.load('./data/lra/retrieval/retrieval_val_2.pt').to(torch.int32)
+    target_val = torch.load('./data/lra/retrieval/retrieval_val_target.pt').to(torch.int32)
+
+    data_test_1 = torch.load('./data/lra/retrieval/retrieval_test_1.pt').to(torch.int32)
+    data_test_2 = torch.load('./data/lra/retrieval/retrieval_test_2.pt').to(torch.int32)
+    target_test = torch.load('./data/lra/retrieval/retrieval_test_target.pt').to(torch.int32)
+
+    if args.pooling_type == 'CLS':
+        cls_token_data_train_1 = torch.tensor([[args.vocab_size - 1] * data_train_1.size(0)]).T
+        cls_token_data_val_1 = torch.tensor([[args.vocab_size - 1] * data_val_1.size(0)]).T
+        cls_token_data_test_1 = torch.tensor([[args.vocab_size - 1] * data_test_1.size(0)]).T
+
+        cls_token_data_train_2 = torch.tensor([[args.vocab_size - 1] * data_train_2.size(0)]).T
+        cls_token_data_val_2 = torch.tensor([[args.vocab_size - 1] * data_val_2.size(0)]).T
+        cls_token_data_test_2 = torch.tensor([[args.vocab_size - 1] * data_test_2.size(0)]).T
+
+        data_train_1 = torch.cat([cls_token_data_train_1, data_train_1], dim=-1)
+        data_val_1 = torch.cat([cls_token_data_val_1, data_val_1], dim=-1)
+        data_test_1 = torch.cat([cls_token_data_test_1, data_test_1], dim=-1)
+
+        data_train_2 = torch.cat([cls_token_data_train_2, data_train_2], dim=-1)
+        data_val_2 = torch.cat([cls_token_data_val_2, data_val_2], dim=-1)
+        data_test_2 = torch.cat([cls_token_data_test_2, data_test_2], dim=-1)
+
+    dataset_train = lra_dataloader.DualDatasetCreator(
+        data1 = data_train_1,
+        data2 = data_train_2,
+        labels = target_train        
+    )
+
+    dataset_val = lra_dataloader.DualDatasetCreator(
+        data1 = data_val_1,
+        data2 = data_val_2,
+        labels = target_val
+    )
+
+    dataset_test = lra_dataloader.DualDatasetCreator(
+        data1 = data_test_1,
+        data2 = data_test_2,
+        labels = target_test
+    )
+
+    dataloader_train = DataLoader(
+        dataset = dataset_train,
+        batch_size = args.batch_size,
+        shuffle = True,
+        drop_last = True,
+        num_workers = 1
+    )
+
+    dataloader_val = DataLoader(
+        dataset = dataset_val,
+        batch_size = args.batch_size,
+        shuffle = False,
+        drop_last = True,
+        num_workers = 1
+    )
+
+    dataloader_test = DataLoader(
+        dataset = dataset_test,
+        batch_size = args.batch_size,
+        shuffle = False,
+        drop_last = True,
+        num_workers = 1
+    )
+
+    return dataloader_train, dataloader_val, dataloader_test
 
 
 def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):

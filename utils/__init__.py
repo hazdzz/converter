@@ -1,4 +1,4 @@
 __all__ = ['activation', 'dropout', 'functional', 'init', 
-           'opt', 'tiger', 'los', 
+           'opt', 'los', 'metrices',
            'early_stopping', 
            'lra_dataloader', 'graph_dataloader']

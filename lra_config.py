@@ -16,7 +16,6 @@ config = {
         "encoder_dim": 32,
         "mlp_dim": 32,
         "num_class": 10,
-        "classifier_type": "single",
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
@@ -48,7 +47,6 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 10,
-        "classifier_type": "single",
         "enable_cuda": True,
         "device_id": 0, # single GPU
         "embed_drop_prob": 0.1,
@@ -80,7 +78,6 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 2,
-        "classifier_type": "single",
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
@@ -112,7 +109,6 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 2,
-        "classifier_type": "single",
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
@@ -144,8 +140,7 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 2,
-        "classifier_type": "dual",
-        "interaction": "concat", # "NLI" or "concat"
+        "interaction": "NLI", # "NLI" or "concat"
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
@@ -155,7 +150,7 @@ config = {
         "batch_size": 256,
         "lr": 0.001,
         "weight_decay": 0.001,
-        "epochs": 30,
+        "epochs": 40,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
         "patience": 5,
         "criteria": 75

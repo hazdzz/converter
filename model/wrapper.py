@@ -140,7 +140,8 @@ class ConverterLRASingle(nn.Module):
 class ConverterLRADual(nn.Module):
     def __init__(self, args) -> None:
         super(ConverterLRADual, self).__init__()
-        self.converter = converter.Converter(args)
+        self.converter1 = converter.Converter(args)
+        self.converter2 = converter.Converter(args)
         self.classifier = DualClassifier(args.pooling_type, 
                                          args.max_seq_len, 
                                          args.encoder_dim, 
@@ -150,8 +151,8 @@ class ConverterLRADual(nn.Module):
                                          )
 
     def forward(self, input1, input2) -> Tensor:
-        encoded1 = self.converter(input1)
-        encoded2 = self.converter(input2)
+        encoded1 = self.converter1(input1)
+        encoded2 = self.converter2(input2)
         classified = self.classifier(encoded1, encoded2)
 
         return classified
