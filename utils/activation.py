@@ -123,6 +123,20 @@ class CLeakyReLU(nn.Module):
         inplace_str = ', inplace=True' if self.inplace else ''
         return 'negative_slope={}{}'.format(self.negative_slope, inplace_str)
 
+class CGELU(nn.Module):
+    __constants__ = ['approximate']
+    approximate: str
+
+    def __init__(self, approximate: str = 'none'):
+        super(CGELU, self).__init__()
+        self.approximate = approximate
+
+    def forward(self, input: Tensor) -> Tensor:
+        return cF.c_gelu(input, approximate=self.approximate)
+
+    def extra_repr(self) -> str:
+        return f'approximate={repr(self.approximate)}'
+
 class TanhExp(nn.Module):
     __constants__ = ['inplace']
     inplace: bool

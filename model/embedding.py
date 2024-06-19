@@ -1,48 +1,61 @@
 import math
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.nn.init as init
 from .norm import ScaleNorm
 from torch import Tensor
 
 
+class SinusoidalPositionEmbedding(nn.Module):
+    def __init__(self, length: int = 512, d_model: int = 64) -> Tensor:
+        super(SinusoidalPositionEmbedding, self).__init__()
+        pe = torch.zeros(length, d_model)
+        
+        position = torch.arange(0, length).unsqueeze(1)
+        div_term = torch.exp((torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)))
+        
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, input: Tensor) -> Tensor:
+        return self.pe[:, :input.size(1)].to(input.device)
+
+
+# class Conv1DPositionEmbedding(nn.Module):
+#     def __init__(self, in_channels, out_channels, kernel_size, 
+#                  stride=1, padding='same', dilation=1, groups=1, 
+#                  bias=False, padding_mode='zeros') -> None:
+#         super(Conv1DPositionEmbedding, self).__init__()
+#         self.conv1d = nn.Conv1d(in_channels, out_channels, kernel_size, 
+#                                 stride, padding, dilation, groups, 
+#                                 bias, padding_mode
+#                                 )
+
+#     def forward(self, input: Tensor) -> Tensor:
+#         return self.conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
+
 class Conv1DPositionEmbedding(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, 
-                 stride=1, padding=0, dilation=1, groups=1, 
-                 bias=True, padding_mode='zeros') -> None:
+                 stride=1, padding='same', dilation=1, 
+                 bias=False, padding_mode='zeros') -> None:
         super(Conv1DPositionEmbedding, self).__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.bias = bias # bias has to be enabled
-        self.conv1d = nn.Conv1d(in_channels, out_channels, kernel_size, 
-                              stride, padding, dilation, groups, 
-                              bias, padding_mode
-                            )
 
-        self.reset_parameters()
+        self.depthwise_conv1d = nn.Conv1d(in_channels, out_channels, kernel_size, 
+                                stride, padding, dilation, groups=in_channels, 
+                                bias=bias, padding_mode=padding_mode
+                                )
+        self.pointwise_conv1d = nn.Conv1d(in_channels, out_channels, kernel_size=1, 
+                                          stride=1, padding=0, dilation=1, groups=1, 
+                                          bias=bias, padding_mode=padding_mode)
+        self.relu = nn.ReLU()
 
-    def reset_parameters(self) -> None:
-        if self.in_channels >= self.out_channels:
-            init.normal_(self.conv1d.weight, mean=0, std=1 / self.in_channels)
-        else:
-            init.normal_(self.conv1d.weight, mean=0, std=1 / self.out_channels)
-        if self.bias:
-            init.zeros_(self.conv1d.bias)
-
-    def forward(self, input) -> Tensor:
-        input = input.permute(0, 2, 1)
-
-        # padding is necessary
-        if self.kernel_size % 2 == 0:
-            input = F.pad(input, (self.kernel_size // 2 - 1, self.kernel_size // 2), mode='constant', value=0)
-        else:
-            input = F.pad(input, (self.kernel_size // 2, self.kernel_size // 2), mode='constant', value=0)
-        
-        input_conv1d = self.conv1d(input)
-
-        output = input_conv1d.permute(0, 2, 1)
+    def forward(self, input: Tensor) -> Tensor:
+        input_dwconv1d = self.depthwise_conv1d(input.permute(0, 2, 1))
+        input_dwconv1d = self.relu(input_dwconv1d)
+        output = self.pointwise_conv1d(input_dwconv1d).permute(0, 2, 1)
 
         return output
 
@@ -50,7 +63,7 @@ class ConverterEmbedding(nn.Module):
     def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, embed_dim, 
                  embed_drop_prob) -> None:
         super(ConverterEmbedding, self).__init__()
-        assert pe_type in ['nope', 'spe', 'ape', 'cpe']
+        assert pe_type in ['nope', 'spe', 'ape', 'cope']
 
         self.pe_type = pe_type
         self.vocab_size = vocab_size
@@ -60,63 +73,43 @@ class ConverterEmbedding(nn.Module):
             padding_idx = vocab_size - 2
         else:
             padding_idx = None
-        self.token_embed = nn.Embedding(
-                            vocab_size,
-                            embed_dim,
-                            padding_idx
-                        )
-        self.pos_embed = nn.Embedding(
-                            max_seq_len, 
-                            embed_dim
-                        )
+        self.token_embed = nn.Embedding(vocab_size, embed_dim, padding_idx)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
         self.conv1d = Conv1DPositionEmbedding(in_channels=embed_dim, 
                                               out_channels=embed_dim, 
-                                              kernel_size=embed_dim)
+                                              kernel_size=embed_dim, 
+                                              dilation=1
+                                              )
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
-        self.token_embed_norm = ScaleNorm(embed_dim, eps=1e-8)
-
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.normal_(self.token_embed.weight, mean=0, std=1 / self.max_seq_len)
-        init.normal_(self.pos_embed.weight, mean=0, std=1 / self.max_seq_len)
+        init.normal_(self.token_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
+        init.normal_(self.pos_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
 
-    def sinusoidal_positional_encoding(self, d_model, length, device) -> Tensor:
-        if d_model % 2 != 0:
-            raise ValueError("Cannot use sin/cos positional encoding \
-                             with odd dim (got dim={:d})".format(d_model)
-                            )
-
-        pe = torch.zeros(length, d_model)
-
-        position = torch.arange(0, length).unsqueeze(1)
-        div_term = torch.exp((torch.arange(0, d_model, 2) \
-                              * (-math.log(10000.0) / d_model)))
-        
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-
-        return pe.to(device)
-    
-    def forward(self, input) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         token_embed = self.token_embed(input)
         if self.pe_type == 'nope':
+            # No Position Embedding
             embed = token_embed
         elif self.pe_type == 'spe':
-            pos_embed = self.sinusoidal_positional_encoding(self.embed_dim, self.max_seq_len, input.device)
+            # Sinusoidal Positional Encoding
+            pos_embed = self.sin_pos_embed(token_embed)
             embed = token_embed + pos_embed
         elif self.pe_type == 'ape':
+            # Absolute Learnable Position Embedding
             pos_ids = torch.arange(self.max_seq_len, dtype=torch.long, device=input.device)
             pos_ids = pos_ids.expand(input.size(0), self.max_seq_len)
             pos_embed = self.pos_embed(pos_ids)
             embed = token_embed + pos_embed
-        elif self.pe_type == 'cpe':
-            token_embed_norm = self.token_embed_norm(token_embed)
-            pos_embed = self.conv1d(token_embed_norm)
+        elif self.pe_type == 'cope':
+            # Convolutional Position Embedding
+            pos_embed = self.conv1d(token_embed)
             embed = token_embed + pos_embed
         else:
             raise ValueError(f'ERROR: The Position Embedding {self.pe} is not implemented yet.')
-        
-        embed_output = self.embed_dropout(embed)
 
-        return embed_output
+        embed = self.embed_dropout(embed)
+
+        return embed

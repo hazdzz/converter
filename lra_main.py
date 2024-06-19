@@ -1,6 +1,8 @@
 import os
-import argparse
+import gc
 import random
+import argparse
+import warnings
 
 import torch
 import torch.nn as nn
@@ -54,6 +56,12 @@ def get_parameters(dataset_name):
     else:
         device = torch.device('cpu')
 
+    # Clean cache
+    if device == torch.device('cpu'):
+        gc.collect()
+    else:
+        torch.cuda.empty_cache()
+
     return args, device
 
 
@@ -67,9 +75,11 @@ def prepare_model(args, device):
 
     loss_nll = nn.NLLLoss()
     loss_seq_kp = los.KernelPolynomialLoss(batch_size = args.batch_size, max_order = args.max_order)
-    loss_feat_kp = los.KernelPolynomialLoss(batch_size = args.batch_size, max_order = args.max_order)
 
-    es = early_stopping.EarlyStopping(mode='min', min_delta=0.0, patience=args.patience)
+    es = early_stopping.EarlyStopping(delta=0.0, 
+                                      patience=args.patience, 
+                                      verbose=True, 
+                                      path="Converter_" + args.dataset_name + ".pt")
     
     if args.optimizer == 'adamw':
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -86,7 +96,7 @@ def prepare_model(args, device):
     
     scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=3, eta_min=0.0005)
 
-    return model, loss_nll, loss_seq_kp, loss_feat_kp, optimizer, scheduler, es
+    return model, loss_nll, loss_seq_kp, optimizer, scheduler, es
 
 
 def prepare_data(args):
@@ -167,7 +177,7 @@ def prepare_data(args):
         batch_size = args.batch_size,
         shuffle = True,
         drop_last = True,
-        num_workers = 1
+        num_workers = args.num_workers
     )
 
     dataloader_val = DataLoader(
@@ -175,7 +185,7 @@ def prepare_data(args):
         batch_size = args.batch_size,
         shuffle = False,
         drop_last = True,
-        num_workers = 1
+        num_workers = args.num_workers
     )
 
     dataloader_test = DataLoader(
@@ -183,35 +193,38 @@ def prepare_data(args):
         batch_size = args.batch_size,
         shuffle = False,
         drop_last = True,
-        num_workers = 1
+        num_workers = args.num_workers
     )
 
     return dataloader_train, dataloader_val, dataloader_test
 
 
-def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, device):
     for _ in range(1, args.epochs + 1):
-        acc_train, loss_train = train(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
-        acc_val, loss_val = val(model, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
+        acc_train, loss_train = train(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
+        acc_val, loss_val = val(args, model, val_loader, loss_nll, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .2f}')
         print(f'val acc: {acc_val: .2f}%')
         print(f'val loss: {loss_val: .2f}')
 
-        if es.step(torch.tensor(loss_val)) and acc_val >= float(args.criteria):
-            print('\nEarly stopping.\n')
+        es(loss_val, model)
+        if es.early_stop:
+            print("Early stopping")
             break
+    
+    return acc_train, loss_train, acc_val, loss_val
 
-    return loss_train, acc_train, loss_val, acc_val
 
-
-def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, device):
     model.train()
 
     acc_meter = metrices.AverageMeter()
     loss_meter = metrices.AverageMeter()
 
-    for _, (samples, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Training")
+
+    for _, (samples, targets) in pbar:
         samples = samples.to(device)
         targets = targets.to(device)
 
@@ -219,11 +232,17 @@ def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_f
         preds = model(samples)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
         loss = loss_nll(preds.squeeze(), targets)
+        if (args.enable_kpm is True) and \
+            (args.enable_kploss is True) and \
+            (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         loss.backward()
         optimizer.step()
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
+
+        pbar.set_postfix(loss=loss_meter.avg)
 
     # scheduler.step()
 
@@ -231,43 +250,60 @@ def train(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_f
 
 
 @torch.no_grad()
-def val(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
     model.eval()
 
     loss_meter = metrices.AverageMeter()
     acc_meter = metrices.AverageMeter()
 
-    for _, (samples, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Validation")
+
+    for _, (samples, targets) in pbar:
         samples = samples.to(device)
         targets = targets.to(device)
 
         preds = model(samples)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
         loss = loss_nll(preds.squeeze(), targets)
+        if (args.enable_kpm is True) and \
+            (args.enable_kploss is True) and \
+            (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
+
+        pbar.set_postfix(loss=loss_meter.avg)
 
     return acc_meter.avg, loss_meter.avg
 
 
 @torch.no_grad()
-def test(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def test(args, model, dataloader, loss_nll, loss_seq_kp, device):
+    model.load_state_dict(torch.load("Converter_" + args.dataset_name + ".pt"))
     model.eval()
 
     loss_meter = metrices.AverageMeter()
     acc_meter = metrices.AverageMeter()
 
-    for _, (samples, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Testing")
+
+    for _, (samples, targets) in pbar:
         samples = samples.to(device)
         targets = targets.to(device)
 
         preds = model(samples)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
         loss = loss_nll(preds.squeeze(), targets)
+        if (args.enable_kpm is True) and \
+            (args.enable_kploss is True) and \
+            (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
+
+        pbar.set_postfix(loss=loss_meter.avg)
 
     return acc_meter.avg, loss_meter.avg
 
@@ -325,7 +361,7 @@ def prepare_data_retrieval(args):
         batch_size = args.batch_size,
         shuffle = True,
         drop_last = True,
-        num_workers = 1
+        num_workers = args.num_workers
     )
 
     dataloader_val = DataLoader(
@@ -333,7 +369,7 @@ def prepare_data_retrieval(args):
         batch_size = args.batch_size,
         shuffle = False,
         drop_last = True,
-        num_workers = 1
+        num_workers = args.num_workers
     )
 
     dataloader_test = DataLoader(
@@ -341,35 +377,38 @@ def prepare_data_retrieval(args):
         batch_size = args.batch_size,
         shuffle = False,
         drop_last = True,
-        num_workers = 1
+        num_workers = args.num_workers
     )
 
     return dataloader_train, dataloader_val, dataloader_test
 
 
-def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, device):
     for _ in range(1, args.epochs + 1):
-        acc_train, loss_train = train_retrieval(model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
-        acc_val, loss_val = val_retrieval(model, val_loader, loss_nll, loss_seq_kp, loss_feat_kp, device)
+        acc_train, loss_train = train_retrieval(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
+        acc_val, loss_val = val_retrieval(args, model, val_loader, loss_nll, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .2f}')
         print(f'val acc: {acc_val: .2f}%')
         print(f'val loss: {loss_val: .2f}')
 
-        if es.step(torch.tensor(loss_val)) and acc_val >= float(args.criteria):
-            print('\nEarly stopping.\n')
+        es(loss_val, model)
+        if es.early_stop:
+            print("Early stopping")
             break
 
-    return loss_train, acc_train, loss_val, acc_val
+    return acc_train, loss_train, acc_val, loss_val
 
 
-def train_retrieval(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, device):
     model.train()
 
     acc_meter = metrices.AverageMeter()
     loss_meter = metrices.AverageMeter()
 
-    for _, (samples_1, samples_2, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Training")
+
+    for _, (samples_1, samples_2, targets) in pbar:
         samples_1 = samples_1.to(device)
         samples_2 = samples_2.to(device)
         targets = targets.to(device)
@@ -378,25 +417,33 @@ def train_retrieval(model, optimizer, scheduler, dataloader, loss_nll, loss_seq_
         preds = model(samples_1, samples_2)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
         loss = loss_nll(preds.squeeze(), targets)
+        if (args.enable_kpm is True) and \
+            (args.enable_kploss is True) and \
+            (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         loss.backward()
         optimizer.step()
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
 
-    # scheduler.step()
+        pbar.set_postfix(loss=loss_meter.avg)
+
+    scheduler.step()
 
     return acc_meter.avg, loss_meter.avg
 
 
 @torch.no_grad()
-def val_retrieval(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
     model.eval()
 
     loss_meter = metrices.AverageMeter()
     acc_meter = metrices.AverageMeter()
 
-    for _, (samples_1, samples_2, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Validation")
+
+    for _, (samples_1, samples_2, targets) in pbar:
         samples_1 = samples_1.to(device)
         samples_2 = samples_2.to(device)
         targets = targets.to(device)
@@ -404,21 +451,30 @@ def val_retrieval(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device
         preds = model(samples_1, samples_2)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
         loss = loss_nll(preds.squeeze(), targets)
+        if (args.enable_kpm is True) and \
+            (args.enable_kploss is True) and \
+            (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
+
+        pbar.set_postfix(loss=loss_meter.avg)
 
     return acc_meter.avg, loss_meter.avg
 
 
 @torch.no_grad()
-def test_retrieval(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, device):
+def test_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
+    model.load_state_dict(torch.load("Converter_" + args.dataset_name + ".pt"))
     model.eval()
 
     loss_meter = metrices.AverageMeter()
     acc_meter = metrices.AverageMeter()
 
-    for _, (samples_1, samples_2, targets) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Testing")
+
+    for _, (samples_1, samples_2, targets) in pbar:
         samples_1 = samples_1.to(device)
         samples_2 = samples_2.to(device)
         targets = targets.to(device)
@@ -426,9 +482,15 @@ def test_retrieval(model, dataloader, loss_nll, loss_seq_kp, loss_feat_kp, devic
         preds = model(samples_1, samples_2)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
         loss = loss_nll(preds.squeeze(), targets)
+        if (args.enable_kpm is True) and \
+            (args.enable_kploss is True) and \
+            (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
+
+        pbar.set_postfix(loss=loss_meter.avg)
 
     return acc_meter.avg, loss_meter.avg
 
@@ -437,37 +499,37 @@ if __name__ == '__main__':
     SEED = 3407
     set_env(SEED)
 
-    args, device = get_parameters('retrieval')
-    model, loss_nll, loss_seq_kp, loss_feat_kp, optimizer, scheduler, es = prepare_model(args, device)
+    warnings.filterwarnings("ignore", category=UserWarning)
+
+    args, device = get_parameters('pathfinder')
+    model, loss_nll, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
     if args.dataset_name == 'retrieval':
         dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)
-        loss_train, acc_train, loss_val, acc_val = run_retrieval(args, 
+        acc_train, loss_train, acc_val, loss_val = run_retrieval(args, 
                                                                  model, 
                                                                  optimizer, 
                                                                  scheduler, 
                                                                  es, 
                                                                  dataloader_train, 
-                                                                 dataloader_val, 
+                                                                 dataloader_val,  
                                                                  loss_nll, 
-                                                                 loss_seq_kp, 
-                                                                 loss_feat_kp, 
+                                                                 loss_seq_kp,  
                                                                  device
                                                                 )
-        loss_test, acc_test = test_retrieval(model, dataloader_test, 
+        acc_test, loss_test = test_retrieval(args, model, dataloader_test, 
                                              loss_nll, loss_seq_kp, 
-                                             loss_feat_kp, device
+                                             device
                                             )
     else:
         dataloader_train, dataloader_val, dataloader_test = prepare_data(args)
-        loss_train, acc_train, loss_val, acc_val = run(args, model, 
+        acc_train, loss_train, acc_val, loss_val = run(args, model, 
                                                        optimizer, scheduler, 
                                                        es, dataloader_train, 
                                                        dataloader_val, loss_nll, 
-                                                       loss_seq_kp, loss_feat_kp, 
-                                                       device
+                                                       loss_seq_kp, device
                                                     )
-        loss_test, acc_test = test(model, dataloader_test, loss_nll, 
-                                   loss_seq_kp, loss_feat_kp, device
+        acc_test, loss_test = test(args, model, dataloader_test, loss_nll, 
+                                   loss_seq_kp, device
                                 )
 
     print(f'test acc: {acc_test: .2f}%')

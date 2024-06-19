@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
@@ -22,11 +23,11 @@ class SingleClassifier(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.normal_(self.linear1.weight, mean=0, std=1 / self.encoder_dim)
-        init.normal_(self.flatten_linear1.weight, mean=0, std=1 / (self.max_seq_len * self.encoder_dim))
-        init.normal_(self.linear2.weight, mean=0, std=1 / self.mlp_dim)
+        init.kaiming_normal_(self.linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.kaiming_normal_(self.flatten_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.xavier_normal_(self.linear2.weight, gain=1.0)
 
-    def pooling(self, input, mode):
+    def pooling(self, input: Tensor, mode: str) -> Tensor:
         if mode == 'CLS':
             pooled = input[:, 0, :]
         elif mode == 'MEAN':
@@ -40,7 +41,7 @@ class SingleClassifier(nn.Module):
         
         return pooled
 
-    def forward(self, encoded) -> Tensor:
+    def forward(self, encoded: Tensor) -> Tensor:
         pooled = self.pooling(encoded, self.pooling_type)
 
         if self.pooling_type == 'FLATTEN':
@@ -67,20 +68,22 @@ class DualClassifier(nn.Module):
         self.nli_linear1 = nn.Linear(encoder_dim * 4, mlp_dim)
         self.flatten_linear1 = nn.Linear(max_seq_len * encoder_dim * 2, mlp_dim)
         self.flatten_nli_linear1 = nn.Linear(max_seq_len * encoder_dim * 4, mlp_dim)
-        self.linear2 = nn.Linear(mlp_dim, num_class)
+        self.linear2 = nn.Linear(mlp_dim, mlp_dim // 2)
+        self.linear3 = nn.Linear(mlp_dim // 2, num_class)
         self.leakyrelu = nn.LeakyReLU()
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.normal_(self.linear1.weight, mean=0, std=1 / (self.encoder_dim * 2))
-        init.normal_(self.nli_linear1.weight, mean=0, std=1 / (self.encoder_dim * 4))
-        init.normal_(self.flatten_linear1.weight, mean=0, std=1 / (self.max_seq_len * self.encoder_dim * 2))
-        init.normal_(self.flatten_nli_linear1.weight, mean=0, std=1 / (self.max_seq_len * self.encoder_dim * 4))
-        init.normal_(self.linear2.weight, mean=0, std=1 / self.mlp_dim)
+        init.kaiming_normal_(self.linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.kaiming_normal_(self.nli_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.kaiming_normal_(self.flatten_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.kaiming_normal_(self.flatten_nli_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.kaiming_normal_(self.linear2.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
+        init.xavier_normal_(self.linear3.weight, gain=1.0)
 
-    def pooling(self, input, mode):
+    def pooling(self, input: Tensor, mode: str) -> Tensor:
         if mode == 'CLS':
             pooled = input[:, 0, :]
         elif mode == 'MEAN':
@@ -94,27 +97,30 @@ class DualClassifier(nn.Module):
         
         return pooled
 
-    def forward(self, encoded_1, encoded_2) -> Tensor:
+    def forward(self, encoded_1: Tensor, encoded_2: Tensor) -> Tensor:
         pooled_1 = self.pooling(encoded_1, self.pooling_type)
         pooled_2 = self.pooling(encoded_2, self.pooling_type)
         if self.interaction == 'NLI':
             # NLI interaction style
-            pooled = torch.concat([pooled_1, pooled_2, 
-                                   pooled_1 * pooled_2, 
-                                   pooled_1 - pooled_2], dim=-1)
+            pooled = torch.cat([pooled_1, 
+                                pooled_2, 
+                                pooled_1 * pooled_2, 
+                                pooled_1 - pooled_2], dim=-1)
             if self.pooling_type == 'FLATTEN':
-                pooled = self.flatten_nli_linear1(pooled)
+                pooled_layer1 = self.flatten_nli_linear1(pooled)
             else:
-                pooled = self.nli_linear1(pooled)
+                pooled_layer1 = self.nli_linear1(pooled)
         else:
-            pooled = torch.concat([pooled_1, pooled_2], dim=-1)
+            pooled = torch.cat([pooled_1, pooled_2], dim=-1)
             if self.pooling_type == 'FLATTEN':
-                pooled = self.flatten_linear1(pooled)
+                pooled_layer1 = self.flatten_linear1(pooled)
             else:
-                pooled = self.linear1(pooled)
-        pooled = self.leakyrelu(pooled)
-        classified = self.linear2(pooled)
-        classified = self.logsoftmax(classified)
+                pooled_layer1 = self.linear1(pooled)
+        pooled_layer1 = self.leakyrelu(pooled_layer1)
+        pooled_layer2 = self.linear2(pooled_layer1)
+        pooled_layer2 = self.leakyrelu(pooled_layer2)
+        pooled_layer3 = self.linear3(pooled_layer2)
+        classified = self.logsoftmax(pooled_layer3)
 
         return classified
 
@@ -130,7 +136,7 @@ class ConverterLRASingle(nn.Module):
                                            args.num_class
                                            )
 
-    def forward(self, input) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         encoded = self.converter(input)
         classified = self.classifier(encoded)
 
@@ -140,8 +146,7 @@ class ConverterLRASingle(nn.Module):
 class ConverterLRADual(nn.Module):
     def __init__(self, args) -> None:
         super(ConverterLRADual, self).__init__()
-        self.converter1 = converter.Converter(args)
-        self.converter2 = converter.Converter(args)
+        self.converter = converter.Converter(args)
         self.classifier = DualClassifier(args.pooling_type, 
                                          args.max_seq_len, 
                                          args.encoder_dim, 
@@ -150,9 +155,9 @@ class ConverterLRADual(nn.Module):
                                          args.interaction
                                          )
 
-    def forward(self, input1, input2) -> Tensor:
-        encoded1 = self.converter1(input1)
-        encoded2 = self.converter2(input2)
+    def forward(self, input1: Tensor, input2: Tensor) -> Tensor:
+        encoded1 = self.converter(input1)
+        encoded2 = self.converter(input2)
         classified = self.classifier(encoded1, encoded2)
 
         return classified

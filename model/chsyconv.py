@@ -2,8 +2,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-import torch.nn.functional as F
 from utils import dropout
+from utils import activation as act
 from torch import Tensor
 
 
@@ -15,16 +15,18 @@ class Eigenvalue(nn.Module):
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
         self.weight_eigenvalue = nn.Parameter(torch.empty(feat_dim, feat_dim))
+        # self.eigenvalue_conv1d = nn.Conv1d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, bias=False)
         self.avgpool1d = nn.AvgPool1d(kernel_size=target_size)
         self.eigenvalue_dropout = nn.Dropout(p=eigenvalue_drop_prob)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.uniform_(self.weight_eigenvalue, a=-math.sqrt(3 / self.feat_dim), b=math.sqrt(3 / self.feat_dim))
+        init.uniform_(self.weight_eigenvalue, a=-math.sqrt(6 / self.feat_dim), b=math.sqrt(6 / self.feat_dim))
 
-    def forward(self, input) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         input_linear = torch.einsum('bnd,de->bne', input, self.weight_eigenvalue)
+        # input_linear = self.eigenvalue_conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
         input_linear = torch.sin(input_linear)
         input_linear = self.eigenvalue_dropout(input_linear)
 
@@ -46,7 +48,7 @@ class Eigenvalue(nn.Module):
 
    
 class KernelPolynomial(nn.Module):
-    def __init__(self, batch_size, kernel_type: str, max_order: int, 
+    def __init__(self, batch_size, kernel_type: str = 'none', max_order: int = 2, 
                  mu: int = 3, xi: float = 4.0, 
                  stigma: float = 0.5, heta: int = 2) -> None:
         super(KernelPolynomial, self).__init__()
@@ -118,7 +120,7 @@ class KernelPolynomial(nn.Module):
             self.gibbs_damp = -torch.pow(self.gibbs_damp, self.heta)
             self.gibbs_damp = torch.exp(self.gibbs_damp)
 
-    def forward(self, seq) -> Tensor:
+    def forward(self, seq: Tensor) -> Tensor:
         gibbs_damp = self.gibbs_damp.to(seq.device)
         
         Tx_0 = torch.ones_like(seq) * self.cheb_coef[:, 0].unsqueeze(1)
@@ -135,33 +137,45 @@ class KernelPolynomial(nn.Module):
                 Tx_0, Tx_1 = Tx_1, Tx_2
 
         return ChebGibbs
+    
 
-
-class ChsyConv2D(nn.Module):
+class ChsyConv(nn.Module):
     def __init__(self, batch_size, length, feat_dim, 
-                 eigenvalue_drop_prob, chsyconv_drop_prob, 
-                 kernel_type, max_order, mu, xi, stigma, heta) -> None:
-        super(ChsyConv2D, self).__init__()
+                 eigenvalue_drop_prob, value_drop_prob, enable_kpm, 
+                 kernel_type: str = 'none', max_order: int = 2, 
+                 mu: int = 3, xi: float = 4.0, 
+                 stigma: float = 0.5, heta: int = 2) -> None:
+        super(ChsyConv, self).__init__()
+        self.feat_dim = feat_dim
+        self.enable_kpm = enable_kpm
         seq_pool_dim = 2
-        feat_pool_dim = 1
         self.seq_eigenvalue = Eigenvalue(batch_size, length, feat_dim, seq_pool_dim, feat_dim, eigenvalue_drop_prob)
         self.seq_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
-        self.feat_eigenvalue = Eigenvalue(batch_size, length, feat_dim, feat_pool_dim, length, eigenvalue_drop_prob)
-        self.feat_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
-        self.chsyconv_dropout = dropout.Dropout(p=chsyconv_drop_prob) # Complex Dropout
+        self.weight_value = nn.Parameter(torch.empty(feat_dim, feat_dim))
+        self.value_dropout = nn.Dropout(p=value_drop_prob)
+        self.crelu = act.CReLU()
 
-    def forward(self, input) -> Tensor:
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        init.xavier_uniform_(self.weight_value, gain=1.0)
+        # init.kaiming_uniform_(self.weight_value, nonlinearity='relu')
+
+    def forward(self, input: Tensor) -> Tensor:
         seq_eigenvalue = self.seq_eigenvalue(input)
-        seq_cheb_eigenvalue = self.seq_kernel_poly(seq_eigenvalue)
+        if self.enable_kpm:
+            seq_cheb_eigenvalue = self.seq_kernel_poly(seq_eigenvalue)
+        else:
+            seq_cheb_eigenvalue = seq_eigenvalue
 
-        feat_eigenvalue = self.feat_eigenvalue(input)
-        feat_cheb_eigenvalue = self.feat_kernel_poly(feat_eigenvalue)
+        value = torch.einsum('bnd,de->bne', input, self.weight_value)
+        value = self.value_dropout(value)
  
-        chsyconv_input = torch.fft.fft2(input, dim=(-2, -1))
-        chsyconv_real = torch.einsum('bn,bnd,bd->bnd', seq_cheb_eigenvalue, chsyconv_input.real, feat_cheb_eigenvalue)
-        chsyconv_imag = torch.einsum('bn,bnd,bd->bnd', seq_cheb_eigenvalue, chsyconv_input.imag, feat_cheb_eigenvalue)
-        chsyconv = chsyconv_real + 1j * chsyconv_imag
-        chsyconv_output = torch.fft.ifft2(chsyconv, dim=(-2, -1))
-        chsyconv_output = self.chsyconv_dropout(chsyconv_output)
+        chsyconv1d_input = torch.fft.fft(value, dim=-2)
+        chsyconv1d_real = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.real)
+        chsyconv1d_imag = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.imag)
+        chsyconv1d = torch.complex(chsyconv1d_real, chsyconv1d_imag)
+        chsyconv1d_output = torch.fft.ifft(chsyconv1d, dim=-2)
+        # chsyconv1d_output = self.crelu(chsyconv1d_output)
 
-        return chsyconv_output
+        return chsyconv1d_output

@@ -1,11 +1,13 @@
 config = {
     "listops":{
-        "pe_type": "cpe",
+        "pe_type": "cope", # "nope", "spe", "ape", or "cope"
         "vocab_size": 15 + 1 + 1, # 15 tokens + 1 PAD + 1 CLS
         "embed_dim": 32,
         "max_seq_len": 1999 + 1,
+        "digraphconv_type": "chsyconv1d",
         "enable_kpm": True,
-        "kernel_type": "none",
+        "enable_kploss": True,
+        "kernel_type": "none", # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
         "max_order": 2,
         "mu": 3,
         "xi": 4.0,
@@ -16,27 +18,31 @@ config = {
         "encoder_dim": 32,
         "mlp_dim": 32,
         "num_class": 10,
+        "interaction": "None",
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
-        "chsyconv_drop_prob": 0.0,
+        "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.0001,
-        "epochs": 20,
+        "weight_decay": 0.001,
+        "epochs": 30,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
         "patience": 2,
-        "criteria": 39
+        "num_workers": 2,
+        "criteria": 41
     },
     "image":{
-        "pe_type": "cpe",
+        "pe_type": "cope", # "nope", "spe", "ape", or "cope"
         "vocab_size": 256, # 256 unique pixel values
         "embed_dim": 64,
         "max_seq_len": 1024,
+        "digraphconv_type": "chsyconv1d",
         "enable_kpm": True,
-        "kernel_type": "none",
+        "enable_kploss": True,
+        "kernel_type": "none", # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
         "max_order": 2,
         "mu": 3,
         "xi": 4.0,
@@ -47,27 +53,31 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 10,
+        "interaction": "None", 
         "enable_cuda": True,
         "device_id": 0, # single GPU
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
-        "chsyconv_drop_prob": 0.0,
+        "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.001,
-        "epochs": 15,
+        "weight_decay": 0.002,
+        "epochs": 10,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
         "patience": 2,
-        "criteria": 46
+        "num_workers": 2,
+        "criteria": 44
     },
     "pathfinder":{
-        "pe_type": "cpe",
+        "pe_type": "cope", # "nope", "spe", "ape", or "cope"
         "vocab_size": 225, # 225 unique pixel values
         "embed_dim": 64,
         "max_seq_len": 1024,
+        "digraphconv_type": "chsyconv1d",
         "enable_kpm": True,
-        "kernel_type": "none",
+        "enable_kploss": True,
+        "kernel_type": "none", # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
         "max_order": 2,
         "mu": 3,
         "xi": 4.0,
@@ -78,27 +88,31 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 2,
+        "interaction": "None",
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
-        "chsyconv_drop_prob": 0.0,
-        "bffn_drop_prob": 0.0,
-        "batch_size": 64,
+        "value_drop_prob": 0.0,
+        "bffn_drop_prob": 0.1,
+        "batch_size": 128,
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 50,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
-        "patience": 2,
-        "criteria": 76
+        "patience": 3,
+        "num_workers": 2,
+        "criteria": 79
     },
     "text":{
-        "pe_type": "cpe",
+        "pe_type": "cope", # "nope", "spe", "ape", or "cope"
         "vocab_size": 95 + 1 + 1, # 95 unique symbols + 1 PAD + 1 CLS
         "embed_dim": 64,
         "max_seq_len": 4096 + 1,
+        "digraphconv_type": "chsyconv1d",
         "enable_kpm": True,
-        "kernel_type": "none",
+        "enable_kploss": True,
+        "kernel_type": "none", # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
         "max_order": 2,
         "mu": 3,
         "xi": 4.0,
@@ -109,27 +123,31 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 2,
+        "interaction": "None",
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
-        "chsyconv_drop_prob": 0.0,
+        "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.001,
-        "epochs": 20,
+        "weight_decay": 0.0001,
+        "epochs": 30,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
-        "patience": 2,
-        "criteria": 76
+        "patience": 3,
+        "num_workers": 2,
+        "criteria": 75
     },
     "retrieval":{
-        "pe_type": "cpe",
+        "pe_type": "cope", # "nope", "spe", "ape", or "cope"
         "vocab_size": 96 + 1 + 1, # 96 unique symbols + 1 PAD + 1 CLS
         "embed_dim": 64,
         "max_seq_len": 4000 + 1,
+        "digraphconv_type": "chsyconv1d",
         "enable_kpm": True,
-        "kernel_type": "none",
+        "enable_kploss": True,
+        "kernel_type": "none", # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
         "max_order": 2,
         "mu": 3,
         "xi": 4.0,
@@ -140,19 +158,20 @@ config = {
         "encoder_dim": 64,
         "mlp_dim": 64,
         "num_class": 2,
-        "interaction": "NLI", # "NLI" or "concat"
+        "interaction": "NLI", # "NLI" or "CAT"
         "enable_cuda": True,
         "device_id": 0,
         "embed_drop_prob": 0.1,
         "eigenvalue_drop_prob": 0.0,
-        "chsyconv_drop_prob": 0.0,
+        "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
         "batch_size": 256,
         "lr": 0.001,
         "weight_decay": 0.001,
-        "epochs": 40,
+        "epochs": 20,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
-        "patience": 5,
-        "criteria": 75
+        "patience": 3,
+        "num_workers": 2,
+        "criteria": 53
     }
 }

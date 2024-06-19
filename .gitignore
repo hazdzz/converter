@@ -7,6 +7,10 @@
 # Data
 data/*
 
+# PyTorch models
+.pt
+.pth
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

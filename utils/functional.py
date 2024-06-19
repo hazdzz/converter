@@ -93,10 +93,17 @@ def z_relu(input: Tensor, inplace: bool = False) -> Tensor:
 
 def c_leaky_relu(input: Tensor, negative_slope: float = 0.01, inplace: bool = False) -> Tensor:
     if input.is_complex():
-        return torch.complex(F.leaky_relu(input=input.real, negative_slope=negative_slope, inplace=inplace), \
-                            F.leaky_relu(input=input.imag, negative_slope=negative_slope, inplace=inplace))
+        return torch.complex(F.leaky_relu(input=input.real, negative_slope=negative_slope, inplace=inplace), 
+                             F.leaky_relu(input=input.imag, negative_slope=negative_slope, inplace=inplace))
     else:
         return F.leaky_relu(input=input, negative_slope=negative_slope, inplace=inplace)
+    
+def c_gelu(input: Tensor, approximate: str = 'none') -> Tensor:
+    if input.is_complex():
+        return torch.complex(F.gelu(input=input.real, approximate=approximate), 
+                             F.gelu(input=input.imag, approximate=approximate))
+    else:
+        return F.gelu(input=input, approximate=approximate)
 
 def tanhexp(input: Tensor, inplace: bool = False) -> Tensor:
     if inplace:
@@ -122,7 +129,7 @@ def sqr_relu(input: Tensor, inplace: bool = False) -> Tensor:
         sqr_relu = F.relu(input=input, inplace=inplace) ** 2
         return sqr_relu
 
-def lip_gelu(input: Tensor, approximate = 'none') -> Tensor:
+def lip_gelu(input: Tensor, approximate: str = 'none') -> Tensor:
     lip_gelu = F.gelu(input=input, approximate=approximate) / 1.129
     return lip_gelu
 

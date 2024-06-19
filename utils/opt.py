@@ -192,15 +192,15 @@ class Adafactor(Optimizer):
 
     def __init__(
         self,
-        params,
-        lr=None,
+        params: ParamsT,
+        lr: Union[float, Tensor] = 1e-3,
         eps=(1e-30, 1e-3),
         clip_threshold=1.0,
         decay_rate=-0.8,
         beta1=None,
-        weight_decay=0.0,
+        weight_decay: float = 1e-2,
         scale_parameter=True,
-        relative_step=True,
+        relative_step=False,
         warmup_init=False,
     ):
         require_version("torch>=1.5.0")  # add_ with alpha
@@ -397,7 +397,7 @@ def get_adafactor_schedule(optimizer, initial_lr=0.0):
 class Lion(Optimizer):
     r"""Implements Lion algorithm."""
 
-    def __init__(self, params, lr=1e-4, betas=(0.9, 0.99), weight_decay=0.0):
+    def __init__(self, params, lr: Union[float, Tensor] = 1e-3, betas=(0.9, 0.99), weight_decay: float = 1e-2):
         """Initialize the hyperparameters.
 
         Args:
@@ -534,8 +534,8 @@ class Tiger(Optimizer):
 
 
 class SophiaG(Optimizer):
-    def __init__(self, params, lr=1e-4, betas=(0.965, 0.99), rho = 0.04,
-         weight_decay=1e-1, *, maximize: bool = False,
+    def __init__(self, params, lr: Union[float, Tensor] = 1e-3, betas=(0.965, 0.99), rho = 0.04,
+         weight_decay: float = 1e-2, *, maximize: bool = False,
          capturable: bool = False):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
