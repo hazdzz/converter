@@ -501,7 +501,7 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    args, device = get_parameters('pathfinder')
+    args, device = get_parameters('text')
     model, loss_nll, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
     if args.dataset_name == 'retrieval':
         dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)

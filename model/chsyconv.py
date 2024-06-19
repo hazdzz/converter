@@ -14,19 +14,19 @@ class Eigenvalue(nn.Module):
         self.length = length
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
-        self.weight_eigenvalue = nn.Parameter(torch.empty(feat_dim, feat_dim))
-        # self.eigenvalue_conv1d = nn.Conv1d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, bias=False)
+        # self.weight_eigenvalue = nn.Parameter(torch.empty(feat_dim, feat_dim))
+        self.conv1d = nn.Conv1d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=3, padding="same", bias=False)
         self.avgpool1d = nn.AvgPool1d(kernel_size=target_size)
         self.eigenvalue_dropout = nn.Dropout(p=eigenvalue_drop_prob)
 
-        self.reset_parameters()
+    #     self.reset_parameters()
 
-    def reset_parameters(self) -> None:
-        init.uniform_(self.weight_eigenvalue, a=-math.sqrt(6 / self.feat_dim), b=math.sqrt(6 / self.feat_dim))
+    # def reset_parameters(self) -> None:
+    #     init.uniform_(self.weight_eigenvalue, a=-math.sqrt(6 / self.feat_dim), b=math.sqrt(6 / self.feat_dim))
 
     def forward(self, input: Tensor) -> Tensor:
-        input_linear = torch.einsum('bnd,de->bne', input, self.weight_eigenvalue)
-        # input_linear = self.eigenvalue_conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
+        # input_linear = torch.einsum('bnd,de->bne', input, self.weight_eigenvalue)
+        input_linear = self.conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
         input_linear = torch.sin(input_linear)
         input_linear = self.eigenvalue_dropout(input_linear)
 
@@ -36,11 +36,6 @@ class Eigenvalue(nn.Module):
         else:
             pooled = self.avgpool1d(input_linear.permute(0, 2 ,1))
             pooled = pooled.view(self.batch_size, self.feat_dim)
-
-        # pooled_min = pooled.min(dim=1, keepdim=True).values
-        # pooled_max = pooled.max(dim=1, keepdim=True).values
-        # pooled_scaled = (pooled - pooled_min) / (pooled_max - pooled_min).clamp(min=1e-8)
-        # eigenvalue = 2 * pooled_scaled - 1
 
         eigenvalue = pooled
 

@@ -32,7 +32,7 @@ config = {
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
         "patience": 2,
         "num_workers": 2,
-        "criteria": 41
+        "criteria": 40
     },
     "image":{
         "pe_type": "cope", # "nope", "spe", "ape", or "cope"
@@ -62,7 +62,7 @@ config = {
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.002,
+        "weight_decay": 0.001,
         "epochs": 10,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
         "patience": 2,
@@ -132,10 +132,10 @@ config = {
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.0001,
+        "weight_decay": 0.001,
         "epochs": 30,
         "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
-        "patience": 3,
+        "patience": 5,
         "num_workers": 2,
         "criteria": 75
     },
