@@ -83,8 +83,6 @@ def prepare_model(args, device):
     
     if args.optimizer == 'adamw':
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optimizer == 'adafactor':
-        optimizer = opt.Adafactor(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'lion':
         optimizer = opt.Lion(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'tiger':
@@ -501,7 +499,7 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    args, device = get_parameters('text')
+    args, device = get_parameters('image')
     model, loss_nll, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
     if args.dataset_name == 'retrieval':
         dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)

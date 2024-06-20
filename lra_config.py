@@ -29,7 +29,7 @@ config = {
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 30,
-        "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
+        "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
         "patience": 2,
         "num_workers": 2,
         "criteria": 40
@@ -64,8 +64,8 @@ config = {
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 10,
-        "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
-        "patience": 2,
+        "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
+        "patience": 1,
         "num_workers": 2,
         "criteria": 44
     },
@@ -99,7 +99,7 @@ config = {
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 50,
-        "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
+        "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
         "patience": 3,
         "num_workers": 2,
         "criteria": 79
@@ -134,8 +134,8 @@ config = {
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 30,
-        "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
-        "patience": 5,
+        "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
+        "patience": 4,
         "num_workers": 2,
         "criteria": 75
     },
@@ -169,7 +169,7 @@ config = {
         "lr": 0.001,
         "weight_decay": 0.001,
         "epochs": 20,
-        "optimizer": "sophia", # "adamw", "adafactor", "lion", "tiger", or "sophia"
+        "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
         "patience": 3,
         "num_workers": 2,
         "criteria": 53
