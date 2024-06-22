@@ -1,14 +1,6 @@
-import collections
-import importlib.metadata
-import operator
-import re
-import sys
-import math
 import torch
-from packaging import version
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
-from torch.optim.lr_scheduler import LambdaLR
 from typing import Any, Iterable, Dict, List, Union, Optional, TypeAlias
 
 

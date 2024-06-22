@@ -1,7 +1,5 @@
 import math
 import torch
-from typing import Optional, Callable
-from torch import Tensor
 
 
 class EarlyStopping:

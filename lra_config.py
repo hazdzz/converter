@@ -21,7 +21,7 @@ config = {
         "interaction": "None",
         "enable_cuda": True,
         "device_id": 0,
-        "embed_drop_prob": 0.1,
+        "embed_drop_prob": 0.0,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
@@ -56,7 +56,7 @@ config = {
         "interaction": "None", 
         "enable_cuda": True,
         "device_id": 0, # single GPU
-        "embed_drop_prob": 0.1,
+        "embed_drop_prob": 0.0,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
@@ -91,7 +91,7 @@ config = {
         "interaction": "None",
         "enable_cuda": True,
         "device_id": 0,
-        "embed_drop_prob": 0.1,
+        "embed_drop_prob": 0.0,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
@@ -126,13 +126,13 @@ config = {
         "interaction": "None",
         "enable_cuda": True,
         "device_id": 0,
-        "embed_drop_prob": 0.1,
+        "embed_drop_prob": 0.0,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
         "batch_size": 64,
         "lr": 0.001,
-        "weight_decay": 0.001,
+        "weight_decay": 0.002,
         "epochs": 30,
         "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
         "patience": 4,
@@ -161,7 +161,7 @@ config = {
         "interaction": "NLI", # "NLI" or "CAT"
         "enable_cuda": True,
         "device_id": 0,
-        "embed_drop_prob": 0.1,
+        "embed_drop_prob": 0.0,
         "eigenvalue_drop_prob": 0.0,
         "value_drop_prob": 0.0,
         "bffn_drop_prob": 0.1,
@@ -170,7 +170,7 @@ config = {
         "weight_decay": 0.001,
         "epochs": 20,
         "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
-        "patience": 3,
+        "patience": 5,
         "num_workers": 2,
         "criteria": 53
     }

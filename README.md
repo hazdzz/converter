@@ -16,12 +16,6 @@ The official PyTorch implementation of Converter proposed by our paper *Converte
 ## Datasets
 1. LRA: https://mega.nz/file/sdcU3RKR#Skl5HomJJldPBqI7vfLlSAX8VA0XKWiQSPX1E09dwbk
 
-## Requirements
-To install requirements:
-```console
-pip3 install -r requirements.txt
-```
-
 ## Training Steps
 1. Create a data folder:
 ```console
@@ -41,4 +35,10 @@ mv $datast ./data/$datast
 
 4. Run the main file
 ```console
-python $dataset_main.py
+python $dataset_main.py --task="$task"
+```
+
+## Requirements
+To install requirements:
+```console
+pip3 install -r requirements.txt

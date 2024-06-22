@@ -40,7 +40,7 @@ class SinusoidalPositionEmbedding(nn.Module):
 class Conv1DPositionEmbedding(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, 
                  stride=1, padding='same', dilation=1, 
-                 bias=False, padding_mode='zeros') -> None:
+                 bias=True, padding_mode='zeros') -> None:
         super(Conv1DPositionEmbedding, self).__init__()
 
         self.depthwise_conv1d = nn.Conv1d(in_channels, out_channels, kernel_size, 
@@ -81,6 +81,7 @@ class ConverterEmbedding(nn.Module):
                                               kernel_size=embed_dim, 
                                               dilation=1
                                               )
+        self.embed_norm = ScaleNorm(embed_dim, eps=1e-12)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
         self.reset_parameters()
 
@@ -110,6 +111,7 @@ class ConverterEmbedding(nn.Module):
         else:
             raise ValueError(f'ERROR: The Position Embedding {self.pe} is not implemented yet.')
 
+        embed = self.embed_norm(embed)
         embed = self.embed_dropout(embed)
 
         return embed

@@ -2,43 +2,30 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from utils import dropout
-from utils import activation as act
 from torch import Tensor
 
 
-class Eigenvalue(nn.Module):
+class GenerateEigenvalue(nn.Module):
     def __init__(self, batch_size, length, feat_dim, pool_dim, target_size, eigenvalue_drop_prob) -> None:
-        super(Eigenvalue, self).__init__()
+        super(GenerateEigenvalue, self).__init__()
         self.batch_size = batch_size
         self.length = length
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
-        # self.weight_eigenvalue = nn.Parameter(torch.empty(feat_dim, feat_dim))
-        self.conv1d = nn.Conv1d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=3, padding="same", bias=False)
+        self.pointwise_conv1d = nn.Conv1d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, padding='same', groups=1, bias=True)
         self.avgpool1d = nn.AvgPool1d(kernel_size=target_size)
         self.eigenvalue_dropout = nn.Dropout(p=eigenvalue_drop_prob)
 
-    #     self.reset_parameters()
-
-    # def reset_parameters(self) -> None:
-    #     init.uniform_(self.weight_eigenvalue, a=-math.sqrt(6 / self.feat_dim), b=math.sqrt(6 / self.feat_dim))
-
     def forward(self, input: Tensor) -> Tensor:
-        # input_linear = torch.einsum('bnd,de->bne', input, self.weight_eigenvalue)
-        input_linear = self.conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
+        input_linear = self.pointwise_conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
         input_linear = torch.sin(input_linear)
         input_linear = self.eigenvalue_dropout(input_linear)
 
         if self.pool_dim == -1 or self.pool_dim == 2:
-            pooled = self.avgpool1d(input_linear)
-            pooled = pooled.view(self.batch_size, self.length)
+            eigenvalue = self.avgpool1d(input_linear).view(self.batch_size, self.length)
         else:
-            pooled = self.avgpool1d(input_linear.permute(0, 2 ,1))
-            pooled = pooled.view(self.batch_size, self.feat_dim)
-
-        eigenvalue = pooled
-
+            eigenvalue = self.avgpool1d(input_linear.permute(0, 2 ,1)).view(self.batch_size, self.feat_dim)
+        
         return eigenvalue
 
    
@@ -144,17 +131,15 @@ class ChsyConv(nn.Module):
         self.feat_dim = feat_dim
         self.enable_kpm = enable_kpm
         seq_pool_dim = 2
-        self.seq_eigenvalue = Eigenvalue(batch_size, length, feat_dim, seq_pool_dim, feat_dim, eigenvalue_drop_prob)
+        self.seq_eigenvalue = GenerateEigenvalue(batch_size, length, feat_dim, seq_pool_dim, feat_dim, eigenvalue_drop_prob)
         self.seq_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
         self.weight_value = nn.Parameter(torch.empty(feat_dim, feat_dim))
         self.value_dropout = nn.Dropout(p=value_drop_prob)
-        self.crelu = act.CReLU()
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         init.xavier_uniform_(self.weight_value, gain=1.0)
-        # init.kaiming_uniform_(self.weight_value, nonlinearity='relu')
 
     def forward(self, input: Tensor) -> Tensor:
         seq_eigenvalue = self.seq_eigenvalue(input)
@@ -171,6 +156,5 @@ class ChsyConv(nn.Module):
         chsyconv1d_imag = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.imag)
         chsyconv1d = torch.complex(chsyconv1d_real, chsyconv1d_imag)
         chsyconv1d_output = torch.fft.ifft(chsyconv1d, dim=-2)
-        # chsyconv1d_output = self.crelu(chsyconv1d_output)
 
         return chsyconv1d_output

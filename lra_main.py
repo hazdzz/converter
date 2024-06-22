@@ -30,9 +30,12 @@ def set_env(seed = 3407) -> None:
     torch.use_deterministic_algorithms(True)
 
 
-def get_parameters(dataset_name):
-    parser = argparse.ArgumentParser(description=f"Configure the parameters for {dataset_name} task.")
-    task_config = config[dataset_name]
+def get_parameters():
+    parser = argparse.ArgumentParser(description="Configure the parameters for the task.")
+    parser.add_argument('--task', type=str, default='text', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
+    args_task = parser.parse_args()
+
+    task_config = config[args_task.task]
 
     for key, value in task_config.items():
         key_type = type(value)
@@ -53,14 +56,10 @@ def get_parameters(dataset_name):
         # This option is crucial for multiple GPUs
         # 'cuda' ≡ 'cuda:0'
         device = torch.device('cuda')
+        torch.cuda.empty_cache()
     else:
         device = torch.device('cpu')
-
-    # Clean cache
-    if device == torch.device('cpu'):
         gc.collect()
-    else:
-        torch.cuda.empty_cache()
 
     return args, device
 
@@ -499,7 +498,7 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    args, device = get_parameters('image')
+    args, device = get_parameters()
     model, loss_nll, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
     if args.dataset_name == 'retrieval':
         dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)

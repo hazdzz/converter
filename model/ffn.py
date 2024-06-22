@@ -5,9 +5,9 @@ import torch.nn.init as init
 from torch import Tensor
 
 
-class BFFN(nn.Module):
+class BilinearFeedForward(nn.Module):
     def __init__(self, length, feat_dim, bffn_drop_prob) -> None:
-        super(BFFN, self).__init__()
+        super(BilinearFeedForward, self).__init__()
         self.length = length
         self.feat_dim = feat_dim
         self.weight_query_real = nn.Parameter(torch.empty((feat_dim, feat_dim)))
@@ -38,6 +38,5 @@ class BFFN(nn.Module):
         kv_attn = self.relu(kv_attn) / self.feat_dim
 
         bffn = torch.einsum('bnd,bde->bne', query, kv_attn)
-        # bffn = self.relu(bffn)
 
         return bffn

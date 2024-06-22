@@ -24,10 +24,9 @@ class Converter(nn.Module):
                                           args.max_order, args.mu, args.xi, 
                                           args.stigma, args.heta
                                           )
-        self.bffn = ffn.BFFN(args.max_seq_len, args.embed_dim, args.bffn_drop_prob)
-        self.embed_norm = norm.ScaleNorm(args.embed_dim, eps=1e-8)
-        self.chsyconv_norm = norm.ScaleNorm(args.embed_dim, eps=1e-8)
-        self.bffn_norm = norm.ScaleNorm(args.embed_dim, eps=1e-8)
+        self.bffn = ffn.BilinearFeedForward(args.max_seq_len, args.embed_dim, args.bffn_drop_prob)
+        self.chsyconv_norm = norm.ScaleNorm(args.embed_dim, eps=1e-12)
+        self.bffn_norm = norm.ScaleNorm(args.embed_dim, eps=1e-12)
         self.alpha = nn.Parameter(torch.ones(1))
 
     def forward(self, input) -> Tensor:
@@ -36,11 +35,12 @@ class Converter(nn.Module):
 
         embed = self.embedding(input)
 
-        embed_norm = self.embed_norm(embed)
-        chsyconv = self.chsyconv(embed_norm) + embed
-
+        chsyconv = self.chsyconv(embed) + embed
         chsyconv_normed = self.chsyconv_norm(chsyconv)
-        bffn = self.bffn(chsyconv_normed) + alpha * chsyconv.real + beta * chsyconv.imag
 
-        encoder_output = self.bffn_norm(bffn)
+        bffn = self.bffn(chsyconv_normed) + alpha * chsyconv_normed.real + beta * chsyconv_normed.imag
+        bffn_norm = self.bffn_norm(bffn)
+
+        encoder_output = bffn_norm
+
         return encoder_output
