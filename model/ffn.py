@@ -14,7 +14,6 @@ class BilinearFeedForward(nn.Module):
         self.weight_query_imag = nn.Parameter(torch.empty((feat_dim, feat_dim)))
         self.weight_key = nn.Parameter(torch.empty((feat_dim, feat_dim)))
         self.weight_value = nn.Parameter(torch.empty((feat_dim, feat_dim)))
-        self.relu = nn.ReLU()
         self.bffn_dropout = nn.Dropout(p=bffn_drop_prob)
 
         self.reset_parameters()
@@ -35,7 +34,7 @@ class BilinearFeedForward(nn.Module):
         value = torch.einsum('bnd,de->bne', x.imag, self.weight_value)
 
         kv_attn = torch.einsum('bnd,bne->bde', key, value)
-        kv_attn = self.relu(kv_attn) / self.feat_dim
+        kv_attn = torch.tanh(kv_attn)
 
         bffn = torch.einsum('bnd,bde->bne', query, kv_attn)
 

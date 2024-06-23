@@ -135,7 +135,7 @@ config = {
         "weight_decay": 0.002,
         "epochs": 30,
         "optimizer": "sophia", # "adamw", "lion", "tiger", or "sophia"
-        "patience": 4,
+        "patience": 2,
         "num_workers": 2,
         "criteria": 75
     },
