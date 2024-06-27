@@ -33,8 +33,10 @@ class BilinearFeedForward(nn.Module):
         key = torch.einsum('bnd,de->bne', x.real, self.weight_key)
         value = torch.einsum('bnd,de->bne', x.imag, self.weight_value)
 
-        kv_attn = torch.einsum('bnd,bne->bde', key, value)
-        kv_attn = torch.tanh(kv_attn)
+        key_norm = key.norm(dim=1, keepdim=True)
+        value_norm = value.norm(dim=1, keepdim=True)
+        kv_score = torch.einsum('bnd,bne->bde', key, value)
+        kv_attn = kv_score / (key_norm.permute(0, 2, 1) * value_norm).clamp(min=1e-12)
 
         bffn = torch.einsum('bnd,bde->bne', query, kv_attn)
 

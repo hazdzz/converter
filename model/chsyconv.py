@@ -12,12 +12,18 @@ class GenerateEigenvalue(nn.Module):
         self.length = length
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
-        self.pointwise_conv1d = nn.Conv1d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, padding='same', groups=1, bias=True)
+        self.linear = nn.Linear(in_features=feat_dim, out_features=feat_dim, bias=True)
         self.avgpool1d = nn.AvgPool1d(kernel_size=target_size)
         self.eigenvalue_dropout = nn.Dropout(p=eigenvalue_drop_prob)
 
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        init.uniform_(self.linear.weight, a=-math.sqrt(6 / self.feat_dim), b=math.sqrt(6 / self.feat_dim))
+        init.zeros_(self.linear.bias)
+
     def forward(self, input: Tensor) -> Tensor:
-        input_linear = self.pointwise_conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
+        input_linear = self.linear(input)
         input_linear = torch.sin(input_linear)
         input_linear = self.eigenvalue_dropout(input_linear)
 

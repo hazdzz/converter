@@ -9,7 +9,7 @@ from torch import Tensor
 # 16th International Conference on Spoken Language Translation. 
 # Association for Computational Linguistics. 
 class ScaleNorm(nn.Module):
-    def __init__(self, dim, eps: float = 1e-5, bias: bool = False) -> None:
+    def __init__(self, dim, eps: float = 1e-8, bias: bool = False) -> None:
         super(ScaleNorm, self).__init__()
         self.eps = eps
         self.scale = nn.Parameter(torch.empty(dim))
@@ -38,7 +38,7 @@ class ScaleNorm(nn.Module):
 # Root Mean Square Layer Normalization. 
 # Advances in Neural Information Processing Systems (pp. 12360–12371).
 class RMSNorm(nn.Module):
-    def __init__(self, dim, eps: float = 1e-5, bias: bool = False) -> None:
+    def __init__(self, dim, eps: float = 1e-8, bias: bool = False) -> None:
         super(RMSNorm, self).__init__()
         self.eps = eps
         self.scale = nn.Parameter(torch.empty(dim))
