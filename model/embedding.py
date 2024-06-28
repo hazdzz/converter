@@ -24,32 +24,14 @@ class SinusoidalPositionEmbedding(nn.Module):
         return self.pe[:, :input.size(1)].to(input.device)
 
 
-# class Conv1DPositionEmbedding(nn.Module):
-#     def __init__(self, in_channels, out_channels, kernel_size, 
-#                  stride=1, padding='same', dilation=1, groups=1, 
-#                  bias=False, padding_mode='zeros') -> None:
-#         super(Conv1DPositionEmbedding, self).__init__()
-#         self.conv1d = nn.Conv1d(in_channels, out_channels, kernel_size, 
-#                                 stride, padding, dilation, groups, 
-#                                 bias, padding_mode
-#                                 )
-
-#     def forward(self, input: Tensor) -> Tensor:
-#         return self.conv1d(input.permute(0, 2, 1)).permute(0, 2, 1)
-
-class Conv1DPositionEmbedding(nn.Module):
+class CoPE(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, 
-                 stride=1, padding='same', dilation=1, 
-                 bias=True, padding_mode='zeros') -> None:
-        super(Conv1DPositionEmbedding, self).__init__()
-
-        self.depthwise_conv1d = nn.Conv1d(in_channels, out_channels, kernel_size, 
-                                stride, padding, dilation, groups=in_channels, 
-                                bias=bias, padding_mode=padding_mode
-                                )
-        self.pointwise_conv1d = nn.Conv1d(in_channels, out_channels, kernel_size=1, 
-                                          stride=1, padding=0, dilation=1, groups=1, 
-                                          bias=bias, padding_mode=padding_mode)
+                 padding='same') -> None:
+        super(CoPE, self).__init__()
+        self.depthwise_conv1d = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, 
+                                          kernel_size=kernel_size, padding=padding, groups=in_channels)
+        self.pointwise_conv1d = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, 
+                                          kernel_size=1, groups=1)
         self.relu = nn.ReLU()
 
     def forward(self, input: Tensor) -> Tensor:
@@ -58,6 +40,7 @@ class Conv1DPositionEmbedding(nn.Module):
         output = self.pointwise_conv1d(input_dwconv1d).permute(0, 2, 1)
 
         return output
+
 
 class ConverterEmbedding(nn.Module):
     def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, embed_dim, 
@@ -76,11 +59,7 @@ class ConverterEmbedding(nn.Module):
         self.token_embed = nn.Embedding(vocab_size, embed_dim, padding_idx)
         self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
         self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
-        self.conv1d = Conv1DPositionEmbedding(in_channels=embed_dim, 
-                                              out_channels=embed_dim, 
-                                              kernel_size=embed_dim, 
-                                              dilation=1
-                                              )
+        self.conv1d = CoPE(in_channels=embed_dim, out_channels=embed_dim, kernel_size=embed_dim)
         self.embed_norm = ScaleNorm(embed_dim, eps=1e-12)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
         self.reset_parameters()
