@@ -157,10 +157,10 @@ class ChsyConv(nn.Module):
         value = torch.einsum('bnd,de->bne', input, self.weight_value)
         value = self.value_dropout(value)
  
-        chsyconv1d_input = torch.fft.fft(value, dim=-2, norm="ortho")
+        chsyconv1d_input = torch.fft.fft(value, dim=-2)
         chsyconv1d_real = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.real)
         chsyconv1d_imag = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.imag)
         chsyconv1d = torch.complex(chsyconv1d_real, chsyconv1d_imag)
-        chsyconv1d_output = torch.fft.ifft(chsyconv1d, dim=-2, norm="ortho")
+        chsyconv1d_output = torch.fft.ifft(chsyconv1d, dim=-2)
 
         return chsyconv1d_output
