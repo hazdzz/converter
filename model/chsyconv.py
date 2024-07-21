@@ -111,7 +111,7 @@ class KernelPolynomial(nn.Module):
     def forward(self, seq: Tensor) -> Tensor:
         gibbs_damp = self.gibbs_damp.to(seq.device)
         
-        Tx_0 = torch.ones_like(seq) * self.cheb_coef[:, 0].unsqueeze(1)
+        Tx_0 = self.cheb_coef[:, 0].unsqueeze(1)
         ChebGibbs = Tx_0
 
         Tx_1 = seq
