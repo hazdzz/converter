@@ -32,7 +32,7 @@ def set_env(seed = 3407) -> None:
 
 def get_parameters():
     parser = argparse.ArgumentParser(description="Configure the parameters for the task.")
-    parser.add_argument('--task', type=str, default='image', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
+    parser.add_argument('--task', type=str, default='retrieval', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
     args_task = parser.parse_args()
 
     task_config = config[args_task.task]

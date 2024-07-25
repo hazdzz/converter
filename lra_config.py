@@ -144,7 +144,7 @@ config = {
         "enable_kpm": True,
         "enable_kploss": True,
         "kernel_type": "none", # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
-        "max_order": 2,
+        "max_order": 3,
         "mu": 3,
         "xi": 4.0,
         "stigma": 0.5,
