@@ -60,7 +60,7 @@ class ConverterEmbedding(nn.Module):
         self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
         self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
         self.conv1d = CoPE(in_channels=embed_dim, out_channels=embed_dim, kernel_size=embed_dim)
-        self.embed_norm = ScaleNorm(embed_dim, eps=1e-12)
+        self.embed_norm = ScaleNorm(embed_dim)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
         self.reset_parameters()
 

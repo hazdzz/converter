@@ -25,11 +25,11 @@ class Converter(nn.Module):
                                           args.stigma, args.heta
                                           )
         self.bffn = ffn.BilinearFeedForward(args.max_seq_len, args.embed_dim, args.bffn_drop_prob)
-        self.chsyconv_norm = norm.ScaleNorm(args.embed_dim, eps=1e-12)
-        self.bffn_norm = norm.ScaleNorm(args.embed_dim, eps=1e-12)
+        self.chsyconv_norm = norm.ScaleNorm(args.embed_dim)
+        self.bffn_norm = norm.ScaleNorm(args.embed_dim)
         self.alpha = nn.Parameter(torch.ones(1))
 
-    def forward(self, input) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         alpha = torch.clamp(self.alpha, min=0.0, max=1.0).to(input.device)
         beta = 1.0 - alpha
 

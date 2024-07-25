@@ -59,6 +59,7 @@ class KernelPolynomial(nn.Module):
 
     def reset_parameters(self) -> None:
         init.ones_(self.cheb_coef)
+        init.constant_(self.cheb_coef[0], 2.0)
 
         if self.kernel_type == 'none' or self.kernel_type == 'dirichlet':
             self.gibbs_damp = torch.ones(self.batch_size, self.max_order + 1)
@@ -111,7 +112,7 @@ class KernelPolynomial(nn.Module):
     def forward(self, seq: Tensor) -> Tensor:
         gibbs_damp = self.gibbs_damp.to(seq.device)
         
-        Tx_0 = self.cheb_coef[:, 0].unsqueeze(1)
+        Tx_0 = torch.ones_like(seq) * self.cheb_coef[:, 0].unsqueeze(1) * 0.5
         ChebGibbs = Tx_0
 
         Tx_1 = seq

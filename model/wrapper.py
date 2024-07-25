@@ -14,9 +14,9 @@ class SingleClassifier(nn.Module):
         self.encoder_dim = encoder_dim
         self.mlp_dim = mlp_dim
         self.num_class = num_class
-        self.linear1 = nn.Linear(encoder_dim, mlp_dim)
-        self.flatten_linear1 = nn.Linear(max_seq_len * encoder_dim, mlp_dim)
-        self.linear2 = nn.Linear(mlp_dim, num_class)
+        self.linear1 = nn.Linear(in_features=encoder_dim, out_features=mlp_dim, bias=False)
+        self.flatten_linear1 = nn.Linear(in_features=max_seq_len * encoder_dim, out_features=mlp_dim, bias=False)
+        self.linear2 = nn.Linear(in_features=mlp_dim, out_features=num_class, bias=False)
         self.leakyrelu = nn.LeakyReLU()
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
@@ -26,7 +26,10 @@ class SingleClassifier(nn.Module):
         init.kaiming_normal_(self.linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
         init.kaiming_normal_(self.flatten_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
         init.xavier_normal_(self.linear2.weight, gain=1.0)
-
+        # init.zeros_(self.linear1.bias)
+        # init.zeros_(self.flatten_linear1.bias)
+        # init.zeros_(self.linear2.bias)
+    
     def pooling(self, input: Tensor, mode: str) -> Tensor:
         if mode == 'CLS':
             pooled = input[:, 0, :]
@@ -64,12 +67,12 @@ class DualClassifier(nn.Module):
         self.max_seq_len = max_seq_len
         self.encoder_dim = encoder_dim
         self.mlp_dim = mlp_dim
-        self.linear1 = nn.Linear(encoder_dim * 2, mlp_dim)
-        self.nli_linear1 = nn.Linear(encoder_dim * 4, mlp_dim)
-        self.flatten_linear1 = nn.Linear(max_seq_len * encoder_dim * 2, mlp_dim)
-        self.flatten_nli_linear1 = nn.Linear(max_seq_len * encoder_dim * 4, mlp_dim)
-        self.linear2 = nn.Linear(mlp_dim, mlp_dim // 2)
-        self.linear3 = nn.Linear(mlp_dim // 2, num_class)
+        self.linear1 = nn.Linear(in_features=encoder_dim * 2, out_features=mlp_dim, bias=False)
+        self.nli_linear1 = nn.Linear(in_features=encoder_dim * 4, out_features=mlp_dim, bias=False)
+        self.flatten_linear1 = nn.Linear(in_features=max_seq_len * encoder_dim * 2, out_features=mlp_dim, bias=False)
+        self.flatten_nli_linear1 = nn.Linear(in_features=max_seq_len * encoder_dim * 4, out_features=mlp_dim, bias=False)
+        self.linear2 = nn.Linear(in_features=mlp_dim, out_features=mlp_dim // 2, bias=False)
+        self.linear3 = nn.Linear(in_features=mlp_dim // 2, out_features=num_class, bias=False)
         self.leakyrelu = nn.LeakyReLU()
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
@@ -82,6 +85,12 @@ class DualClassifier(nn.Module):
         init.kaiming_normal_(self.flatten_nli_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
         init.kaiming_normal_(self.linear2.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
         init.xavier_normal_(self.linear3.weight, gain=1.0)
+        # init.zeros_(self.linear1.bias)
+        # init.zeros_(self.nli_linear1.bias)
+        # init.zeros_(self.flatten_linear1.bias)
+        # init.zeros_(self.flatten_nli_linear1.bias)
+        # init.zeros_(self.linear2.bias)
+        # init.zeros_(self.linear3.bias)
 
     def pooling(self, input: Tensor, mode: str) -> Tensor:
         if mode == 'CLS':
