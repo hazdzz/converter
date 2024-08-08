@@ -2,7 +2,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from model import converter
+from .converter import Converter
+from .norm import ScaleNorm
 from torch import Tensor
 
 
@@ -137,7 +138,7 @@ class DualClassifier(nn.Module):
 class ConverterLRASingle(nn.Module):
     def __init__(self, args) -> None:
         super(ConverterLRASingle, self).__init__()
-        self.converter = converter.Converter(args)
+        self.converter = Converter(args, None)
         self.classifier = SingleClassifier(args.pooling_type, 
                                            args.max_seq_len, 
                                            args.encoder_dim, 
@@ -155,7 +156,7 @@ class ConverterLRASingle(nn.Module):
 class ConverterLRADual(nn.Module):
     def __init__(self, args) -> None:
         super(ConverterLRADual, self).__init__()
-        self.converter = converter.Converter(args)
+        self.converter = Converter(args, None)
         self.classifier = DualClassifier(args.pooling_type, 
                                          args.max_seq_len, 
                                          args.encoder_dim, 

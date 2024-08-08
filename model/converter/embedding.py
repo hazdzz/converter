@@ -57,19 +57,24 @@ class ConverterEmbedding(nn.Module):
         else:
             padding_idx = None
         self.token_embed = nn.Embedding(vocab_size, embed_dim, padding_idx)
-        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
-        self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
-        self.conv1d = CoPE(in_channels=embed_dim, out_channels=embed_dim, kernel_size=embed_dim)
+        if pe_type == 'ape':
+            self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        elif pe_type == 'spe':
+            self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
+        elif pe_type == 'cope':
+            self.conv1d = CoPE(in_channels=embed_dim, out_channels=embed_dim, kernel_size=embed_dim)
         self.embed_norm = ScaleNorm(embed_dim)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         init.normal_(self.token_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
-        init.normal_(self.pos_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
+        if self.pe_type == 'ape':
+            init.normal_(self.pos_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
 
     def forward(self, input: Tensor) -> Tensor:
         token_embed = self.token_embed(input)
+        
         if self.pe_type == 'nope':
             # No Position Embedding
             embed = token_embed

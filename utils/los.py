@@ -7,8 +7,8 @@ from torch import Tensor
 class KernelPolynomialLoss(nn.Module):
     def __init__(self, batch_size: int = 1, 
                  max_order: int = 2, 
-                 eta: float = 0.1, 
-                 enable_simplified: bool = True
+                 eta: float = 1e-6, 
+                 enable_simplified: bool = False
                  ) -> None:
         super(KernelPolynomialLoss, self).__init__()
         self.batch_size = batch_size
@@ -20,11 +20,10 @@ class KernelPolynomialLoss(nn.Module):
         order = torch.arange(0, self.max_order + 1, device=cheb_coef.device, dtype=cheb_coef.dtype)
 
         if self.enable_simplified:
-            loss = torch.sum(cheb_coef.pow(2) * order.pow(2) / math.pow(self.max_order + 1, 2))
+            loss = torch.sum(cheb_coef.pow(2) * order.pow(2)) / math.pow(self.max_order + 1, 2)
         else:
             loss = torch.sum(cheb_coef.pow(2) * order.pow(2) * math.pi * self.eta)
         
-        if self.batch_size > 1:
-            loss = loss / self.batch_size
+        loss = loss / self.batch_size
         
         return loss

@@ -1,13 +1,13 @@
 # Converter
 
 ## About
-The official PyTorch implementation of Converter proposed by our paper *Converter: Converting Transformers into DGNNs*.
+The official PyTorch implementation of Converter proposed by our paper *Converter: Converting Transformer into DGNN form*.
 
 ## Citation
 ```
 @article{zhang2024converter,
     author  = {Zhang, Jie and Wang, Kuan-Chieh and Chiu, Bo-Wei and Sun, Min-Te},
-    title   = {Converter: Converting Transformers into DGNNs},
+    title   = {Converter: Converting Transformer into DGNN form},
     journal = {arXiv preprint},
     year    = {2024}
 }

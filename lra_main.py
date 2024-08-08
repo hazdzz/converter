@@ -2,6 +2,7 @@ import os
 import gc
 import random
 import argparse
+import yaml
 import warnings
 
 import torch
@@ -11,8 +12,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from lra_config import config
-from model import wrapper
+from model.converter import wrapper
 from utils import lra_dataloader, early_stopping, opt, los, metrices
 
 
@@ -25,17 +25,22 @@ def set_env(seed = 3407) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+    # torch.backends.cudnn.enabled = False
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
     torch.use_deterministic_algorithms(True)
 
 
 def get_parameters():
-    parser = argparse.ArgumentParser(description="Configure the parameters for the task.")
-    parser.add_argument('--task', type=str, default='retrieval', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
-    args_task = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Converter for lra data')
+    parser.add_argument('--config', type=str, default='lra_config.yaml', help='Path to the yaml configuration file')
+    parser.add_argument('--task', type=str, default='image', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
+    args = parser.parse_args()
 
-    task_config = config[args_task.task]
+    with open(args.config, 'r') as file:
+        config = yaml.safe_load(file)
+
+    task_config = config[args.task]
 
     for key, value in task_config.items():
         key_type = type(value)
@@ -57,6 +62,7 @@ def get_parameters():
         # 'cuda' ≡ 'cuda:0'
         device = torch.device('cuda')
         torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
     else:
         device = torch.device('cpu')
         gc.collect()
@@ -67,18 +73,18 @@ def get_parameters():
 def prepare_model(args, device):
     torch.autograd.set_detect_anomaly(True)
 
-    if args.dataset_name == 'retrieval':
+    if args.dataset == 'retrieval':
         model = wrapper.ConverterLRADual(args).to(device)
     else:
         model = wrapper.ConverterLRASingle(args).to(device)
 
     loss_nll = nn.NLLLoss()
-    loss_seq_kp = los.KernelPolynomialLoss(batch_size = args.batch_size, max_order = args.max_order)
+    loss_seq_kp = los.KernelPolynomialLoss(batch_size=args.batch_size, max_order=args.max_order, eta=1e-6, enable_simplified=True)
 
     es = early_stopping.EarlyStopping(delta=0.0, 
-                                      patience=args.patience, 
+                                      patience=args.patience,
                                       verbose=True, 
-                                      path="Converter_" + args.dataset_name + ".pt")
+                                      path="converter_" + args.dataset + ".pt")
     
     if args.optimizer == 'adamw':
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -88,6 +94,8 @@ def prepare_model(args, device):
         optimizer = opt.Tiger(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'sophia':
         optimizer = opt.SophiaG(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'adan':
+        optimizer = opt.Adan(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         raise ValueError(f'ERROR: The {args.optimizer} optimizer is undefined.')
     
@@ -97,9 +105,9 @@ def prepare_model(args, device):
 
 
 def prepare_data(args):
-    assert args.dataset_name in ['image', 'text', 'listops', 'pathfinder', 'path-x']
+    assert args.dataset in ['image', 'text', 'listops', 'pathfinder', 'path-x']
 
-    if args.dataset_name == 'image':
+    if args.dataset == 'image':
         data_train = torch.load('./data/lra/image/image_train.pt').to(torch.int32)
         target_train = torch.load('./data/lra/image/image_train_target.pt').to(torch.int32)
 
@@ -108,7 +116,7 @@ def prepare_data(args):
 
         data_test = torch.load('./data/lra/image/image_test.pt').to(torch.int32)
         target_test = torch.load('./data/lra/image/image_test_target.pt').to(torch.int32)
-    elif args.dataset_name == 'text':
+    elif args.dataset == 'text':
         data_train = torch.load('./data/lra/text/text_train.pt').to(torch.int32)
         target_train = torch.load('./data/lra/text/text_train_target.pt').to(torch.int32)
 
@@ -117,7 +125,7 @@ def prepare_data(args):
 
         data_test = torch.load('./data/lra/text/text_test.pt').to(torch.int32)
         target_test = torch.load('./data/lra/text/text_test_target.pt').to(torch.int32)
-    elif args.dataset_name == 'listops':
+    elif args.dataset == 'listops':
         data_train = torch.load('./data/lra/listops/listops_train.pt').to(torch.int32)
         target_train = torch.load('./data/lra/listops/listops_train_target.pt').to(torch.int32)
 
@@ -126,7 +134,7 @@ def prepare_data(args):
 
         data_test = torch.load('./data/lra/listops/listops_test.pt').to(torch.int32)
         target_test = torch.load('./data/lra/listops/listops_test_target.pt').to(torch.int32)
-    elif args.dataset_name == 'pathfinder':
+    elif args.dataset == 'pathfinder':
         data_train = torch.load('./data/lra/pathfinder/pathfinder_train.pt').to(torch.int32)
         target_train = torch.load('./data/lra/pathfinder/pathfinder_train_target.pt').to(torch.int32)
 
@@ -198,7 +206,7 @@ def prepare_data(args):
 
 def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, device):
     for _ in range(1, args.epochs + 1):
-        acc_train, loss_train = train(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
+        acc_train, loss_train, peak_memory_train = train(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
         acc_val, loss_val = val(args, model, val_loader, loss_nll, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .2f}')
@@ -210,7 +218,7 @@ def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nl
             print("Early stopping")
             break
     
-    return acc_train, loss_train, acc_val, loss_val
+    return acc_train, loss_train, acc_val, loss_val, peak_memory_train
 
 
 def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, device):
@@ -232,7 +240,7 @@ def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, 
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
         loss.backward()
         optimizer.step()
 
@@ -242,8 +250,9 @@ def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, 
         pbar.set_postfix(loss=loss_meter.avg)
 
     # scheduler.step()
+    peak_memory = torch.cuda.max_memory_allocated()
 
-    return acc_meter.avg, loss_meter.avg
+    return acc_meter.avg, loss_meter.avg, peak_memory
 
 
 @torch.no_grad()
@@ -265,7 +274,7 @@ def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -277,7 +286,7 @@ def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
 @torch.no_grad()
 def test(args, model, dataloader, loss_nll, loss_seq_kp, device):
-    model.load_state_dict(torch.load("Converter_" + args.dataset_name + ".pt"))
+    model.load_state_dict(torch.load("converter_" + args.dataset + ".pt"))
     model.eval()
 
     loss_meter = metrices.AverageMeter()
@@ -295,7 +304,7 @@ def test(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -382,7 +391,7 @@ def prepare_data_retrieval(args):
 
 def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, device):
     for _ in range(1, args.epochs + 1):
-        acc_train, loss_train = train_retrieval(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
+        acc_train, loss_train, peak_memory_train = train_retrieval(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
         acc_val, loss_val = val_retrieval(args, model, val_loader, loss_nll, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .2f}')
@@ -394,7 +403,7 @@ def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loade
             print("Early stopping")
             break
 
-    return acc_train, loss_train, acc_val, loss_val
+    return acc_train, loss_train, acc_val, loss_val, peak_memory_train
 
 
 def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, device):
@@ -417,7 +426,7 @@ def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, los
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
         loss.backward()
         optimizer.step()
 
@@ -426,9 +435,10 @@ def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, los
 
         pbar.set_postfix(loss=loss_meter.avg)
 
-    scheduler.step()
+    # scheduler.step()
+    peak_memory = torch.cuda.max_memory_allocated()
 
-    return acc_meter.avg, loss_meter.avg
+    return acc_meter.avg, loss_meter.avg, peak_memory
 
 
 @torch.no_grad()
@@ -451,7 +461,7 @@ def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -463,7 +473,7 @@ def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
 @torch.no_grad()
 def test_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
-    model.load_state_dict(torch.load("Converter_" + args.dataset_name + ".pt"))
+    model.load_state_dict(torch.load("converter_" + args.dataset + ".pt"))
     model.eval()
 
     loss_meter = metrices.AverageMeter()
@@ -482,7 +492,7 @@ def test_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -500,9 +510,9 @@ if __name__ == '__main__':
 
     args, device = get_parameters()
     model, loss_nll, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
-    if args.dataset_name == 'retrieval':
+    if args.dataset == 'retrieval':
         dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)
-        acc_train, loss_train, acc_val, loss_val = run_retrieval(args, 
+        acc_train, loss_train, acc_val, loss_val, peak_memory_train = run_retrieval(args, 
                                                                  model, 
                                                                  optimizer, 
                                                                  scheduler, 
@@ -510,7 +520,8 @@ if __name__ == '__main__':
                                                                  dataloader_train, 
                                                                  dataloader_val,  
                                                                  loss_nll, 
-                                                                 loss_seq_kp,  
+                                                                 loss_seq_kp, 
+                                                                  
                                                                  device
                                                                 )
         acc_test, loss_test = test_retrieval(args, model, dataloader_test, 
@@ -519,7 +530,7 @@ if __name__ == '__main__':
                                             )
     else:
         dataloader_train, dataloader_val, dataloader_test = prepare_data(args)
-        acc_train, loss_train, acc_val, loss_val = run(args, model, 
+        acc_train, loss_train, acc_val, loss_val, peak_memory_train = run(args, model, 
                                                        optimizer, scheduler, 
                                                        es, dataloader_train, 
                                                        dataloader_val, loss_nll, 
@@ -531,3 +542,4 @@ if __name__ == '__main__':
 
     print(f'test acc: {acc_test: .2f}%')
     print(f'test loss: {loss_test: .2f}')
+    print(f"Peak memory usage in traing: {peak_memory_train / 1024 / 1024 / 1024:.2f} GiB")
