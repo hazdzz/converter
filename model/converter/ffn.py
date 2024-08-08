@@ -31,9 +31,9 @@ class BilinearFeedForward(nn.Module):
         
         query_real = torch.einsum('bnd,de->bne', x_real, self.weight_query_real)
         query_imag = torch.einsum('bnd,de->bne', x_imag, self.weight_query_imag)
-        query = query_real * query_imag
+        # query = query_real * query_imag
         query = self.relu(query_real) * self.relu(query_imag)
-        # query = self.bffn_dropout(query)
+        query = self.bffn_dropout(query)
 
         key = torch.einsum('bnd,de->bne', x_real, self.weight_key)
         value = torch.einsum('bnd,de->bne', x_imag, self.weight_value)

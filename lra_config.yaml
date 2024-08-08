@@ -91,7 +91,7 @@ image:
   embed_drop_prob: 0.0
   eigenvalue_drop_prob: 0.1
   value_drop_prob: 0.0
-  bffn_drop_prob: 0.1
+  bffn_drop_prob: 0.0
   batch_size: 64
   lr: 0.001
   weight_decay: 0.001
