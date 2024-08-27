@@ -74,28 +74,28 @@ def prepare_model(args, device):
     torch.autograd.set_detect_anomaly(True)
 
     if args.dataset == 'retrieval':
-        model = wrapper.ConverterLRADual(args).to(device)
+        model = wrapper.LRADual(args).to(device)
     else:
-        model = wrapper.ConverterLRASingle(args).to(device)
+        model = wrapper.LRASingle(args).to(device)
 
     loss_nll = nn.NLLLoss()
-    loss_seq_kp = los.KernelPolynomialLoss(batch_size=args.batch_size, max_order=args.max_order, eta=1e-6, enable_simplified=True)
+    loss_seq_kp = los.KernelPolynomialLoss(batch_size=args.batch_size, max_order=args.max_order, eta=args.eta)
 
     es = early_stopping.EarlyStopping(delta=0.0, 
                                       patience=args.patience,
                                       verbose=True, 
                                       path="converter_" + args.dataset + ".pt")
     
-    if args.optimizer == 'adamw':
+    if args.optimizer == 'adamw': 
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optimizer == 'lion': # default optimizer
-        optimizer = opt.Lion(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optimizer == 'tiger':
-        optimizer = opt.Tiger(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optimizer == 'sophia':
-        optimizer = opt.SophiaG(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'nadamw': # default
+        optimizer = optim.NAdam(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay, decoupled_weight_decay=True)
     elif args.optimizer == 'adan':
         optimizer = opt.Adan(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'lion':
+        optimizer = opt.Lion(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'sophia':
+        optimizer = opt.SophiaG(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         raise ValueError(f'ERROR: The {args.optimizer} optimizer is undefined.')
     
@@ -209,9 +209,9 @@ def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nl
         acc_train, loss_train, peak_memory_train = train(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
         acc_val, loss_val = val(args, model, val_loader, loss_nll, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
-        print(f'train loss: {loss_train: .2f}')
+        print(f'train loss: {loss_train: .4f}')
         print(f'val acc: {acc_val: .2f}%')
-        print(f'val loss: {loss_val: .2f}')
+        print(f'val loss: {loss_val: .4f}')
 
         es(loss_val, model)
         if es.early_stop:
@@ -240,7 +240,7 @@ def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, 
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         loss.backward()
         optimizer.step()
 
@@ -274,8 +274,7 @@ def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
-
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
 
@@ -304,8 +303,7 @@ def test(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
-
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
 
@@ -394,9 +392,9 @@ def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loade
         acc_train, loss_train, peak_memory_train = train_retrieval(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
         acc_val, loss_val = val_retrieval(args, model, val_loader, loss_nll, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
-        print(f'train loss: {loss_train: .2f}')
+        print(f'train loss: {loss_train: .4f}')
         print(f'val acc: {acc_val: .2f}%')
-        print(f'val loss: {loss_val: .2f}')
+        print(f'val loss: {loss_val: .4f}')
 
         es(loss_val, model)
         if es.early_stop:
@@ -426,7 +424,7 @@ def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, los
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef) 
         loss.backward()
         optimizer.step()
 
@@ -461,7 +459,7 @@ def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef) 
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -492,7 +490,7 @@ def test_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.cheb_coef_hook.cheb_coef) 
+            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef) 
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -521,7 +519,6 @@ if __name__ == '__main__':
                                                                  dataloader_val,  
                                                                  loss_nll, 
                                                                  loss_seq_kp, 
-                                                                  
                                                                  device
                                                                 )
         acc_test, loss_test = test_retrieval(args, model, dataloader_test, 
@@ -537,9 +534,8 @@ if __name__ == '__main__':
                                                        loss_seq_kp, device
                                                     )
         acc_test, loss_test = test(args, model, dataloader_test, loss_nll, 
-                                   loss_seq_kp, device
-                                )
+                                   loss_seq_kp, device)
 
     print(f'test acc: {acc_test: .2f}%')
-    print(f'test loss: {loss_test: .2f}')
+    print(f'test loss: {loss_test: .4f}')
     print(f"Peak memory usage in traing: {peak_memory_train / 1024 / 1024 / 1024:.2f} GiB")

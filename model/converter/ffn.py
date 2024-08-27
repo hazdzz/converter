@@ -6,22 +6,29 @@ from torch import Tensor
 
 
 class BilinearFeedForward(nn.Module):
-    def __init__(self, feat_dim, bffn_drop_prob) -> None:
+    def __init__(self, length, feat_dim, bffn_drop_prob) -> None:
         super(BilinearFeedForward, self).__init__()
-        self.weight_query_real = nn.Parameter(torch.empty((feat_dim, feat_dim)))
-        self.weight_query_imag = nn.Parameter(torch.empty((feat_dim, feat_dim)))
-        self.weight_key = nn.Parameter(torch.empty((feat_dim, feat_dim)))
-        self.weight_value = nn.Parameter(torch.empty((feat_dim, feat_dim)))
-        self.relu = nn.ReLU()
+        self.length = length
+        self.feat_dim = feat_dim
+        self.query_real_linear = nn.Linear(feat_dim, feat_dim, bias=True)
+        self.query_imag_linear = nn.Linear(feat_dim, feat_dim, bias=True)
+        self.key_linear = nn.Linear(feat_dim, feat_dim, bias=True)
+        self.value_linear = nn.Linear(feat_dim, feat_dim, bias=True)
         self.bffn_dropout = nn.Dropout(p=bffn_drop_prob)
+        self.softplus = nn.Softplus()
+        self.relu = nn.ReLU()
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.xavier_uniform_(self.weight_query_real, gain=1.0)
-        init.xavier_uniform_(self.weight_query_imag, gain=1.0)
-        init.xavier_uniform_(self.weight_key, gain=1.0)
-        init.xavier_uniform_(self.weight_value, gain=1.0)
+        init.xavier_uniform_(self.query_real_linear.weight, gain=1.0)
+        init.xavier_uniform_(self.query_imag_linear.weight, gain=1.0)
+        init.xavier_uniform_(self.key_linear.weight, gain=1.0)
+        init.xavier_uniform_(self.value_linear.weight, gain=1.0)
+        init.zeros_(self.query_real_linear.bias)
+        init.zeros_(self.query_imag_linear.bias)
+        init.zeros_(self.key_linear.bias)
+        init.zeros_(self.value_linear.bias)
 
     def forward(self, x) -> Tensor:
         if torch.is_complex(x):
@@ -29,18 +36,20 @@ class BilinearFeedForward(nn.Module):
         else:
             x_real, x_imag = x, x
         
-        query_real = torch.einsum('bnd,de->bne', x_real, self.weight_query_real)
-        query_imag = torch.einsum('bnd,de->bne', x_imag, self.weight_query_imag)
-        # query = query_real * query_imag
-        query = self.relu(query_real) * self.relu(query_imag)
+        query_real = self.query_real_linear(x_real)
+        query_imag = self.query_imag_linear(x_imag)
+
+        query = torch.mul(query_real, torch.tanh(self.softplus(query_imag)))
         query = self.bffn_dropout(query)
 
-        key = torch.einsum('bnd,de->bne', x_real, self.weight_key)
-        value = torch.einsum('bnd,de->bne', x_imag, self.weight_value)
-        key = key / (torch.norm(key, dim=1, keepdim=True) + 1e-5)
-        value = value / (torch.norm(value, dim=1, keepdim=True) + 1e-5)
-        kv_attn = torch.einsum('bnd,bne->bde', key, value)
-        kv_attn = self.relu(kv_attn)
+        key = self.key_linear(x_real)
+        value = self.value_linear(x_imag)
+
+        key_norm = key / (torch.norm(key, dim=1, keepdim=True) + 1e-5)
+        value_norm = value / (torch.norm(value, dim=1, keepdim=True) + 1e-5)
+
+        kv_attn = torch.einsum('bnd,bne->bde', key_norm, value_norm)
+        kv_attn = self.relu(kv_attn / math.sqrt(self.length))
 
         bffn = torch.einsum('bnd,bde->bne', query, kv_attn)
 

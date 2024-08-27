@@ -115,19 +115,41 @@ def tanhexp(input: Tensor, inplace: bool = False) -> Tensor:
 
 def sinsig(input: Tensor, inplace: bool = False) -> Tensor:
     if inplace:
-        input = torch.mul(input, torch.sin(torch.pi/2 * torch.sigmoid(input))).type(input.type())
+        input = torch.mul(input, torch.sin(0.5 * math.pi * torch.sigmoid(input))).type(input.type())
         return input
     else:
-        sinsig = torch.mul(input, torch.sin(torch.pi/2 * torch.sigmoid(input))).type(input.type())
+        sinsig = torch.mul(input, torch.sin(0.5 * math.pi * torch.sigmoid(input))).type(input.type())
         return sinsig
 
-def sqr_relu(input: Tensor, inplace: bool = False) -> Tensor:
+def sqrrelu(input: Tensor, inplace: bool = False) -> Tensor:
     if inplace:
         input = F.relu(input=input, inplace=inplace) ** 2
         return input
     else:
         sqr_relu = F.relu(input=input, inplace=inplace) ** 2
         return sqr_relu
+
+def squareplus(input: Tensor, bias: float = 4 * (math.log(2) ** 2), inplace: bool = False) -> Tensor:
+    if inplace:
+        input = (torch.sqrt(torch.pow(input, 2) + bias) + input) / 2
+        return input
+    else:
+        squareplus = (torch.sqrt(torch.pow(input, 2) + bias) + input) / 2
+        return squareplus
+    
+def diracrelu(input: Tensor, beta: float = 1.0, inplace: bool = False) -> Tensor:
+    if inplace:
+        term1 = input * torch.erf(input / (math.sqrt(2.0) * beta))
+        term2 = input
+        term3 = math.sqrt(2.0 / math.pi) * beta * torch.exp(-input ** 2 / (2 * beta ** 2))
+        input = 0.5 * (term1 + term2 + term3)
+        return input
+    else:
+        term1 = input * torch.erf(input / (math.sqrt(2.0) * beta))
+        term2 = input
+        term3 = math.sqrt(2.0 / math.pi) * beta * torch.exp(-input ** 2 / (2 * beta ** 2))
+        diracrelu = 0.5 * (term1 + term2 + term3)
+        return diracrelu
 
 def lip_gelu(input: Tensor, approximate: str = 'none') -> Tensor:
     lip_gelu = F.gelu(input=input, approximate=approximate) / 1.129

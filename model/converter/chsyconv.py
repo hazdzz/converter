@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-import torch.nn.functional as F
 from typing import Union
 from torch import Tensor
 
@@ -14,8 +13,7 @@ class GenerateEigenvalue(nn.Module):
         self.length = length
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
-        self.weight_eigenvalue = nn.Parameter(torch.empty(feat_dim, feat_dim))
-        self.bias = nn.Parameter(torch.empty(feat_dim))
+        self.eigenvalue_linear = nn.Linear(feat_dim, feat_dim, bias=True)
         self.avgpool1d = nn.AvgPool1d(kernel_size=target_size)
         self.eigenvalue_dropout = nn.Dropout(p=eigenvalue_drop_prob)
         self.homophily = homophily
@@ -23,12 +21,12 @@ class GenerateEigenvalue(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.uniform_(self.weight_eigenvalue, a=-math.sqrt(6 / self.feat_dim), b=math.sqrt(6 / self.feat_dim))
-        init.zeros_(self.bias)
-
+        bound = math.sqrt(6 / self.feat_dim)
+        init.uniform_(self.eigenvalue_linear.weight, a=-bound, b=bound)
+        init.zeros_(self.eigenvalue_linear.bias)
+    
     def forward(self, input: Tensor) -> Tensor:
-        input_linear = torch.einsum('bnd,de->bne', input, self.weight_eigenvalue)
-        input_linear = input_linear + self.bias
+        input_linear = self.eigenvalue_linear(input)
         input_linear = torch.sin(input_linear)
 
         if self.pool_dim == -1 or self.pool_dim == 2:
@@ -46,52 +44,8 @@ class GenerateEigenvalue(nn.Module):
         eigenvalue = self.eigenvalue_dropout(eigenvalue)
 
         return eigenvalue
-    
 
-class ChebGibbsNodeTarget(nn.Module):
-    def __init__(self, batch_size, max_order, cheb_node_drop_prob) -> None:
-        super(ChebGibbsNodeTarget, self).__init__()
-        self.batch_size = batch_size
-        self.max_order = max_order
-        self.linear1 = nn.Linear(max_order + 1, max_order + 1, bias=True)
-        self.linear2 = nn.Linear(max_order + 1, max_order + 1, bias=True)
-        self.cheb_node_source = torch.empty(batch_size, max_order + 1)
-        self.silu = nn.SiLU()
-        self.cheb_node_dropout = nn.Dropout(p=cheb_node_drop_prob)
 
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        init.xavier_uniform_(self.linear1.weight)
-        init.xavier_uniform_(self.linear2.weight)
-        init.zeros_(self.linear1.bias)
-        init.zeros_(self.linear2.bias)
-
-        for j in range(self.max_order + 1):
-            self.cheb_node_source[:, j] = torch.tensor(math.cos((j + 0.5) * math.pi / (self.max_order + 1)))
-    
-    def forward(self, device) -> Tensor:
-        cheb_node = self.cheb_node_source.to(device)
-        cheb_node = self.linear1(cheb_node)
-        cheb_node = self.silu(cheb_node)
-        cheb_node = self.cheb_node_dropout(cheb_node)
-        cheb_node_target = self.linear2(cheb_node)
-
-        return cheb_node_target
-    
-
-class ChebCoefHook:
-    def __init__(self):
-        self.cheb_coef = None
-
-    def hook(self, module, input, output):
-        if hasattr(module, 'cheb_coef') and module.cheb_coef is not None:
-            self.cheb_coef = module.cheb_coef.detach()
-        else:
-            print("Warning: cheb_coef is not available in the module")
-            self.cheb_coef = None
-
-   
 class KernelPolynomial(nn.Module):
     def __init__(self, batch_size, kernel_type: str = 'none', max_order: int = 2, 
                  mu: int = 3, xi: float = 4.0, 
@@ -109,29 +63,15 @@ class KernelPolynomial(nn.Module):
         self.xi = xi
         self.stigma = stigma
         self.heta = heta
-        self.cheb_coef = None
-        self.cheb_node_target = nn.Parameter(torch.ones(batch_size, max_order + 1))
-        self.cheb_node_source = torch.empty(batch_size, max_order + 1, max_order + 1)
+        self.cheb_coef = nn.Parameter(torch.empty(batch_size, max_order + 1))
         self.gibbs_damp = torch.empty(batch_size, max_order + 1)
-
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        # T_0(x) = 1
-        self.cheb_node_source[:, 0, :] = torch.tensor(1.0)
-        for j in range(self.max_order + 1):
-            # T_1(x) = x
-            # Chebyshev Nodes
-            self.cheb_node_source[:, 1, j] = torch.tensor(math.cos((j + 0.5) * math.pi / (self.max_order + 1)))
-        for k in range(2, self.max_order + 1):
-            # T_2(x) = 2 * x * T_1(x) - T_0(x)
-            self.cheb_node_source[:, k, :] = 2 * self.cheb_node_source[:, 1, :] \
-                                                * self.cheb_node_source[:, k - 1, :] \
-                                                - self.cheb_node_source[:, k - 2, :]
+        init.ones_(self.cheb_coef)
+        init.ones_(self.gibbs_damp)
 
-        if self.kernel_type == 'none' or self.kernel_type == 'dirichlet':
-            self.gibbs_damp = torch.ones(self.batch_size, self.max_order + 1)
-        elif self.kernel_type == 'fejer':
+        if self.kernel_type == 'fejer':
             for k in range(1, self.max_order + 1):
                 self.gibbs_damp[:, k] = torch.tensor(1 - k / (self.max_order + 1))
         elif self.kernel_type == 'jackson':
@@ -179,23 +119,22 @@ class KernelPolynomial(nn.Module):
 
     def forward(self, seq: Tensor) -> Tensor:
         gibbs_damp = self.gibbs_damp.to(seq.device)
-        cheb_node_source = self.cheb_node_source.to(seq.device)
-        self.cheb_coef = torch.matmul(cheb_node_source, self.cheb_node_target.unsqueeze(-1)).squeeze(-1) * 2 / (self.max_order + 1)
+        cheb_coef = self.cheb_coef * 2 / (self.max_order + 1)
 
         # Tx_0 = 1
         Tx_0 = torch.ones_like(seq)
-        ChebGibbs = self.cheb_coef[:, 0].unsqueeze(1) / 2.0
+        ChebGibbs = cheb_coef[:, 0].unsqueeze(1) * 0.5
 
         if self.max_order >= 1:
             # Tx_1 = x
             Tx_1 = seq
-            ChebGibbs = ChebGibbs + Tx_1 * self.cheb_coef[:, 1].unsqueeze(1) * gibbs_damp[:, 1].unsqueeze(1)
+            ChebGibbs = ChebGibbs + Tx_1 * cheb_coef[:, 1].unsqueeze(1) * gibbs_damp[:, 1].unsqueeze(1)
 
         if self.max_order >= 2:
             for k in range(2, self.max_order + 1):
                 # Tx_2 = 2x * Tx_1 - Tx_0 
                 Tx_2 = 2.0 * seq * Tx_1 - Tx_0
-                ChebGibbs = ChebGibbs + Tx_2 * self.cheb_coef[:, k].unsqueeze(1) * gibbs_damp[:, k].unsqueeze(1)
+                ChebGibbs = ChebGibbs + Tx_2 * cheb_coef[:, k].unsqueeze(1) * gibbs_damp[:, k].unsqueeze(1)
                 Tx_0, Tx_1 = Tx_1, Tx_2
 
         return ChebGibbs
@@ -212,28 +151,34 @@ class ChsyConv(nn.Module):
         self.feat_dim = feat_dim
         self.enable_kpm = enable_kpm
         seq_pool_dim = 2
+        # feat_pool_dim = 1
         self.seq_eigenvalue = GenerateEigenvalue(batch_size, length, feat_dim, seq_pool_dim, feat_dim, eigenvalue_drop_prob, homophily)
         self.seq_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
-        self.cheb_coef_hook = ChebCoefHook()
-        self.seq_kernel_poly.register_forward_hook(self.cheb_coef_hook.hook)
-        self.weight_value = nn.Parameter(torch.empty(feat_dim, feat_dim))
+        # self.feat_eigenvalue = GenerateEigenvalue(batch_size, length, feat_dim, feat_pool_dim, length, eigenvalue_drop_prob, homophily)
+        # self.feat_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
+        self.value_linear = nn.Linear(feat_dim, feat_dim, bias=True)
         self.value_dropout = nn.Dropout(p=value_drop_prob)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.xavier_uniform_(self.weight_value, gain=1.0)
+        init.xavier_uniform_(self.value_linear.weight, gain=1.0)
+        init.zeros_(self.value_linear.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         seq_eigenvalue = self.seq_eigenvalue(input)
+        # feat_eigenvalue = self.feat_eigenvalue(input)
+
         if self.enable_kpm:
             seq_cheb_eigenvalue = self.seq_kernel_poly(seq_eigenvalue)
+            # feat_cheb_eigenvalue = self.feat_kernel_poly(feat_eigenvalue)
         else:
             seq_cheb_eigenvalue = seq_eigenvalue
+            # feat_cheb_eigenvalue = feat_eigenvalue
 
-        value = torch.einsum('bnd,de->bne', input, self.weight_value)
+        value = self.value_linear(input)
         value = self.value_dropout(value)
- 
+
         chsyconv1d_input = torch.fft.fft(value, dim=-2)
         chsyconv1d_real = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.real)
         chsyconv1d_imag = torch.einsum('bn,bnd->bnd', seq_cheb_eigenvalue, chsyconv1d_input.imag)

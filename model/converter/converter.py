@@ -8,12 +8,12 @@ from torch import Tensor
 class Converter(nn.Module):
     def __init__(self, args, homophily: Union[float, None]) -> None:
         super(Converter, self).__init__()
-        self.embedding = embedding.ConverterEmbedding(args.pe_type, 
-                                                      args.pooling_type, 
-                                                      args.vocab_size,
-                                                      args.max_seq_len, 
-                                                      args.embed_dim, 
-                                                      args.embed_drop_prob)
+        self.embedding = embedding.Embedding(args.pe_type, 
+                                             args.pooling_type, 
+                                             args.vocab_size, 
+                                             args.max_seq_len, 
+                                             args.embed_dim, 
+                                             args.embed_drop_prob)
         self.chsyconv = chsyconv.ChsyConv(args.batch_size, 
                                           args.max_seq_len, 
                                           args.embed_dim, 
@@ -27,7 +27,7 @@ class Converter(nn.Module):
                                           args.stigma, 
                                           args.heta, 
                                           homophily)
-        self.bffn = ffn.BilinearFeedForward(args.embed_dim, args.bffn_drop_prob)
+        self.bffn = ffn.BilinearFeedForward(args.max_seq_len, args.embed_dim, args.bffn_drop_prob)
         self.chsyconv_norm = norm.ScaleNorm(args.embed_dim)
         self.bffn_norm = norm.ScaleNorm(args.embed_dim)
         self.alpha = nn.Parameter(torch.ones(1))
@@ -43,6 +43,4 @@ class Converter(nn.Module):
         bffn = self.bffn(chsyconv_normed) + alpha * chsyconv_normed.real + (1.0 - alpha) * chsyconv_normed.imag
         bffn_norm = self.bffn_norm(bffn)
 
-        encoder_output = bffn_norm
-
-        return encoder_output
+        return bffn_norm

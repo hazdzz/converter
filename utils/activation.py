@@ -176,11 +176,45 @@ class SquaredReLU(nn.Module):
         self.inplace = inplace
 
     def forward(self, input: Tensor) -> Tensor:
-        return cF.sqr_relu(input, inplace=self.inplace)
+        return cF.sqrrelu(input, inplace=self.inplace)
 
     def extra_repr(self) -> str:
         inplace_str = 'inplace=True' if self.inplace else ''
         return inplace_str
+    
+class SquarePlus(nn.Module):
+    __constants__ = ['bias', 'inplace']
+    bias: float
+    inplace: bool
+
+    def __init__(self, bias: float = 4 * (math.log(2) ** 2), inplace: bool = False):
+        super(SquarePlus, self).__init__()
+        self.bias = bias
+        self.inplace = inplace
+
+    def forward(self, input: Tensor) -> Tensor:
+        return cF.squareplus(input, self.bias, inplace=self.inplace)
+
+    def extra_repr(self) -> str:
+        inplace_str = ', inplace=True' if self.inplace else ''
+        return 'bias={}{}'.format(self.bias, inplace_str)
+    
+class DiracReLU(nn.Module):
+    __constants__ = ['beta', 'inplace']
+    beta: float
+    inplace: bool
+
+    def __init__(self, bias: float = 1.0, inplace: bool = False):
+        super(DiracReLU, self).__init__()
+        self.bias = bias
+        self.inplace = inplace
+
+    def forward(self, input: Tensor) -> Tensor:
+        return cF.diracrelu(input, self.bias, inplace=self.inplace)
+
+    def extra_repr(self) -> str:
+        inplace_str = ', inplace=True' if self.inplace else ''
+        return 'bias={}{}'.format(self.bias, inplace_str)
 
 class LipGELU(nn.Module):
     __constants__ = ['approximate']

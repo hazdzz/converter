@@ -24,29 +24,22 @@ class SinusoidalPositionEmbedding(nn.Module):
         return self.pe[:, :input.size(1)].to(input.device)
 
 
-class CoPE(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, 
-                 padding='same') -> None:
-        super(CoPE, self).__init__()
-        self.depthwise_conv1d = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, 
-                                          kernel_size=kernel_size, padding=padding, groups=in_channels)
-        self.pointwise_conv1d = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, 
-                                          kernel_size=1, groups=1)
-        self.relu = nn.ReLU()
-
+class RecurrentPositionEmbedding(nn.Module):
+    def __init__(self, embed_dim) -> None:
+        super(RecurrentPositionEmbedding, self).__init__()
+        self.gru = nn.GRU(input_size=embed_dim, hidden_size=embed_dim, num_layers=2, batch_first=True, dropout=0.1)
+    
     def forward(self, input: Tensor) -> Tensor:
-        input_dwconv1d = self.depthwise_conv1d(input.permute(0, 2, 1))
-        input_dwconv1d = self.relu(input_dwconv1d)
-        output = self.pointwise_conv1d(input_dwconv1d).permute(0, 2, 1)
+        output, _ = self.gru(input)
 
         return output
 
 
-class ConverterEmbedding(nn.Module):
-    def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, embed_dim, 
-                 embed_drop_prob) -> None:
-        super(ConverterEmbedding, self).__init__()
-        assert pe_type in ['nope', 'spe', 'ape', 'cope']
+class Embedding(nn.Module):
+    def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, 
+                 embed_dim, embed_drop_prob) -> None:
+        super(Embedding, self).__init__()
+        assert pe_type in ['nope', 'spe', 'ape', 'rpe']
 
         self.pe_type = pe_type
         self.vocab_size = vocab_size
@@ -61,10 +54,11 @@ class ConverterEmbedding(nn.Module):
             self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
         elif pe_type == 'spe':
             self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
-        elif pe_type == 'cope':
-            self.conv1d = CoPE(in_channels=embed_dim, out_channels=embed_dim, kernel_size=embed_dim)
+        elif pe_type == 'rpe':
+            self.rpe = RecurrentPositionEmbedding(embed_dim)
         self.embed_norm = ScaleNorm(embed_dim)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
+
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -88,9 +82,9 @@ class ConverterEmbedding(nn.Module):
             pos_ids = pos_ids.expand(input.size(0), self.max_seq_len)
             pos_embed = self.pos_embed(pos_ids)
             embed = token_embed + pos_embed
-        elif self.pe_type == 'cope':
-            # Convolutional Position Embedding
-            pos_embed = self.conv1d(token_embed)
+        elif self.pe_type == 'rpe':
+            # Recurrent Position Embedding
+            pos_embed = self.rpe(token_embed)
             embed = token_embed + pos_embed
         else:
             raise ValueError(f'ERROR: The Position Embedding {self.pe} is not implemented yet.')

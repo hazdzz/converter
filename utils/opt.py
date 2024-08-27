@@ -17,10 +17,10 @@ class Lion(Optimizer):
         Args:
             params (iterable): iterable of parameters to optimize or dicts defining 
                 parameter groups
-            lr (float, optional): learning rate (default: 1e-4)
+            lr (float, optional): learning rate (default: 1e-3)
             betas (Tuple[float, float], optional): coefficients used for computing 
-                running averages of gradient and its square (default: (0.9, 0.99))
-            weight_decay (float, optional): weight decay coefficient (default: 0)
+                running averages of gradient and its square (default: (0.95, 0.98))
+            weight_decay (float, optional): weight decay coefficient (default: 1e-2)
         """
 
         if not 0.0 <= lr:
@@ -96,7 +96,7 @@ class Tiger(Optimizer):
             lr (float, optional): learning rate (default: 1e-3)
             beta (float, float], optional): coefficients used for computing running 
               averages of gradient and its square (default: 0.965)
-            weight_decay (float, optional): weight decay coefficient (default: 0.01)
+            weight_decay (float, optional): weight decay coefficient (default: 1e-2)
         """
         if not 0.0 <= lr:
             raise ValueError('Invalid learning rate: {lr}')
