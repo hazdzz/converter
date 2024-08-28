@@ -7,7 +7,7 @@ The official PyTorch implementation of Converter proposed by our paper *Converte
 ```
 @article{zhang2024converter,
     author  = {Zhang, Jie and Wang, Kuan-Chieh and Chiu, Bo-Wei and Sun, Min-Te},
-    title   = {Converter: Converting Transformer into DGNN form},
+    title   = {Converter: Converting Transformers into DGNNs form},
     journal = {arXiv preprint},
     year    = {2024}
 }
@@ -42,3 +42,8 @@ python $dataset_main.py --task="$task"
 To install requirements:
 ```console
 pip3 install -r requirements.txt
+
+> [!Attention]
+> In order to reproduce the experimental results, we strongly recommand you to adopt the following environment:
+> python ~= 3.10.14
+> cuda ~= 12.1

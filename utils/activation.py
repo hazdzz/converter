@@ -182,13 +182,13 @@ class SquaredReLU(nn.Module):
         inplace_str = 'inplace=True' if self.inplace else ''
         return inplace_str
     
-class SquarePlus(nn.Module):
+class Squareplus(nn.Module):
     __constants__ = ['bias', 'inplace']
     bias: float
     inplace: bool
 
     def __init__(self, bias: float = 4 * (math.log(2) ** 2), inplace: bool = False):
-        super(SquarePlus, self).__init__()
+        super(Squareplus, self).__init__()
         self.bias = bias
         self.inplace = inplace
 

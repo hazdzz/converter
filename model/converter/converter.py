@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
 from model.converter import chsyconv, embedding, ffn, norm
-from typing import Union
 from torch import Tensor
 
 
 class Converter(nn.Module):
-    def __init__(self, args, homophily: Union[float, None]) -> None:
+    def __init__(self, args) -> None:
         super(Converter, self).__init__()
         self.embedding = embedding.Embedding(args.pe_type, 
                                              args.pooling_type, 
@@ -25,8 +24,7 @@ class Converter(nn.Module):
                                           args.mu, 
                                           args.xi, 
                                           args.stigma, 
-                                          args.heta, 
-                                          homophily)
+                                          args.heta)
         self.bffn = ffn.BilinearFeedForward(args.max_seq_len, args.embed_dim, args.bffn_drop_prob)
         self.chsyconv_norm = norm.ScaleNorm(args.embed_dim)
         self.bffn_norm = norm.ScaleNorm(args.embed_dim)

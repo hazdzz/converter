@@ -53,9 +53,9 @@ class Embedding(nn.Module):
         if pe_type == 'ape':
             self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
         elif pe_type == 'spe':
-            self.sin_pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
+            self.pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
         elif pe_type == 'rpe':
-            self.rpe = RecurrentPositionEmbedding(embed_dim)
+            self.pos_embed = RecurrentPositionEmbedding(embed_dim)
         self.embed_norm = ScaleNorm(embed_dim)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
 
@@ -74,7 +74,7 @@ class Embedding(nn.Module):
             embed = token_embed
         elif self.pe_type == 'spe':
             # Sinusoidal Positional Encoding
-            pos_embed = self.sin_pos_embed(token_embed)
+            pos_embed = self.pos_embed(token_embed)
             embed = token_embed + pos_embed
         elif self.pe_type == 'ape':
             # Absolute Learnable Position Embedding
@@ -84,10 +84,10 @@ class Embedding(nn.Module):
             embed = token_embed + pos_embed
         elif self.pe_type == 'rpe':
             # Recurrent Position Embedding
-            pos_embed = self.rpe(token_embed)
+            pos_embed = self.pos_embed(token_embed)
             embed = token_embed + pos_embed
         else:
-            raise ValueError(f'ERROR: The Position Embedding {self.pe} is not implemented yet.')
+            raise ValueError(f'ERROR: The Position Embedding {self.pe_type} is not implemented yet.')
 
         embed = self.embed_norm(embed)
         embed = self.embed_dropout(embed)

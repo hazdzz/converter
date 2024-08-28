@@ -26,10 +26,10 @@ listops:
   batch_size: 64
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.01
+  eta: 0.1
   epochs: 100
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 5
+  patience: 4
   num_workers: 2
 
 text:
@@ -60,10 +60,10 @@ text:
   batch_size: 32
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.01
+  eta: 0.001
   epochs: 60
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 5
+  patience: 4
   num_workers: 2
 
 image:
@@ -72,7 +72,7 @@ image:
   embed_dim: 64
   max_seq_len: 1024
   enable_kpm: true
-  enable_kploss: false
+  enable_kploss: true
   kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
   max_order: 2
   mu: 3
@@ -94,10 +94,10 @@ image:
   batch_size: 64
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.01
+  eta: 0.1
   epochs: 30
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 2
+  patience: 1
   num_workers: 2
 
 pathfinder:
@@ -131,7 +131,7 @@ pathfinder:
   eta: 0.01
   epochs: 60
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 3
+  patience: 2
   num_workers: 2
 
 retrieval:
@@ -140,7 +140,7 @@ retrieval:
   embed_dim: 64
   max_seq_len: 4001
   enable_kpm: true
-  enable_kploss: true
+  enable_kploss: false
   kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
   max_order: 2
   mu: 3
@@ -159,10 +159,10 @@ retrieval:
   eigenvalue_drop_prob: 0.0
   value_drop_prob: 0.1
   bffn_drop_prob: 0.1
-  batch_size: 256
+  batch_size: 128
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.01
+  eta: 0.1
   epochs: 30
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
   patience: 2

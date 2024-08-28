@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
@@ -14,8 +13,10 @@ class SingleClassifier(nn.Module):
         self.encoder_dim = encoder_dim
         self.mlp_dim = mlp_dim
         self.num_class = num_class
-        self.linear1 = nn.Linear(in_features=encoder_dim, out_features=mlp_dim, bias=True)
-        self.flatten_linear1 = nn.Linear(in_features=max_seq_len * encoder_dim, out_features=mlp_dim, bias=True)
+        if pooling_type == 'FLATTEN':
+            self.linear1 = nn.Linear(in_features=max_seq_len * encoder_dim, out_features=mlp_dim, bias=True)
+        else:
+            self.linear1 = nn.Linear(in_features=encoder_dim, out_features=mlp_dim, bias=True)
         self.linear2 = nn.Linear(in_features=mlp_dim, out_features=num_class, bias=True)
         self.leaky_relu = nn.LeakyReLU()
         self.logsoftmax = nn.LogSoftmax(dim=-1)
@@ -24,9 +25,7 @@ class SingleClassifier(nn.Module):
 
     def reset_parameters(self) -> None:
         init.kaiming_normal_(self.linear1.weight, nonlinearity='leaky_relu')
-        init.kaiming_normal_(self.flatten_linear1.weight, nonlinearity='leaky_relu')
         init.xavier_normal_(self.linear2.weight, gain=1.0)
-        init.zeros_(self.flatten_linear1.bias)
         init.zeros_(self.linear1.bias)
         init.zeros_(self.linear2.bias)
     
@@ -46,11 +45,7 @@ class SingleClassifier(nn.Module):
 
     def forward(self, encoded: Tensor) -> Tensor:
         pooled = self.pooling(encoded, self.pooling_type)
-
-        if self.pooling_type == 'FLATTEN':
-            pooled1 = self.flatten_linear1(pooled)
-        else:
-            pooled1 = self.linear1(pooled)
+        pooled1 = self.linear1(pooled)
         pooled1 = self.leaky_relu(pooled1)
         pooled2 = self.linear2(pooled1)
         classified = self.logsoftmax(pooled2)
@@ -68,10 +63,16 @@ class DualClassifier(nn.Module):
         self.encoder_dim = encoder_dim
         self.mlp_dim = mlp_dim
         self.num_class = num_class
-        self.linear1 = nn.Linear(in_features=encoder_dim * 2, out_features=mlp_dim, bias=True)
-        self.nli_linear1 = nn.Linear(in_features=encoder_dim * 4, out_features=mlp_dim, bias=True)
-        self.flatten_linear1 = nn.Linear(in_features=max_seq_len * encoder_dim * 2, out_features=mlp_dim, bias=True)
-        self.flatten_nli_linear1 = nn.Linear(in_features=max_seq_len * encoder_dim * 4, out_features=mlp_dim, bias=True)
+        if interaction == 'CAT':
+            if pooling_type == 'FLATTEN':
+                self.linear1 = nn.Linear(in_features=max_seq_len * encoder_dim * 2, out_features=mlp_dim, bias=True)
+            else:
+                self.linear1 = nn.Linear(in_features=encoder_dim * 2, out_features=mlp_dim, bias=True)
+        else:
+            if pooling_type == 'FLATTEN':
+                self.linear1 = nn.Linear(in_features=max_seq_len * encoder_dim * 4, out_features=mlp_dim, bias=True)
+            else:
+                self.linear1 = nn.Linear(in_features=encoder_dim * 4, out_features=mlp_dim, bias=True)
         self.linear2 = nn.Linear(in_features=mlp_dim, out_features=num_class, bias=True)
         self.leaky_relu = nn.LeakyReLU()
         self.logsoftmax = nn.LogSoftmax(dim=-1)
@@ -80,14 +81,8 @@ class DualClassifier(nn.Module):
 
     def reset_parameters(self) -> None:
         init.kaiming_normal_(self.linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
-        init.kaiming_normal_(self.nli_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
-        init.kaiming_normal_(self.flatten_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
-        init.kaiming_normal_(self.flatten_nli_linear1.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
         init.xavier_normal_(self.linear2.weight, gain=1.0)
         init.zeros_(self.linear1.bias)
-        init.zeros_(self.nli_linear1.bias)
-        init.zeros_(self.flatten_linear1.bias)
-        init.zeros_(self.flatten_nli_linear1.bias)
         init.zeros_(self.linear2.bias)
 
     def pooling(self, input: Tensor, mode: str) -> Tensor:
@@ -113,16 +108,10 @@ class DualClassifier(nn.Module):
                                 pooled_2, 
                                 pooled_1 * pooled_2, 
                                 pooled_1 - pooled_2], dim=-1)
-            if self.pooling_type == 'FLATTEN':
-                pooled_layer1 = self.flatten_nli_linear1(pooled)
-            else:
-                pooled_layer1 = self.nli_linear1(pooled)
+            pooled_layer1 = self.linear1(pooled)
         else:
             pooled = torch.cat([pooled_1, pooled_2], dim=-1)
-            if self.pooling_type == 'FLATTEN':
-                pooled_layer1 = self.flatten_linear1(pooled)
-            else:
-                pooled_layer1 = self.linear1(pooled)
+            pooled_layer1 = self.linear1(pooled)
         pooled_layer1 = self.leaky_relu(pooled_layer1)
         pooled_layer2 = self.linear2(pooled_layer1)
         classified = self.logsoftmax(pooled_layer2)
@@ -133,7 +122,7 @@ class DualClassifier(nn.Module):
 class LRASingle(nn.Module):
     def __init__(self, args) -> None:
         super(LRASingle, self).__init__()
-        self.converter = Converter(args, None)
+        self.converter = Converter(args)
         self.classifier = SingleClassifier(args.pooling_type, 
                                            args.max_seq_len, 
                                            args.encoder_dim, 
@@ -151,7 +140,7 @@ class LRASingle(nn.Module):
 class LRADual(nn.Module):
     def __init__(self, args) -> None:
         super(LRADual, self).__init__()
-        self.converter = Converter(args, None)
+        self.converter = Converter(args)
         self.classifier = DualClassifier(args.pooling_type, 
                                          args.max_seq_len, 
                                          args.encoder_dim, 
