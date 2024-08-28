@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from .norm import ScaleNorm
-from torch import Tensor
+from torch import Tensor, Union
+from torch.nn.common_types import _size_1_t
 
 
 class SinusoidalPositionEmbedding(nn.Module):
@@ -22,12 +23,32 @@ class SinusoidalPositionEmbedding(nn.Module):
 
     def forward(self, input: Tensor) -> Tensor:
         return self.pe[:, :input.size(1)].to(input.device)
+    
+
+class ConvolutionalPositionEmbedding(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: _size_1_t, 
+                 padding: Union[str, _size_1_t] = 'same', drop_rate: float = 0.0) -> None:
+        super(ConvolutionalPositionEmbedding, self).__init__()
+        self.depthwise_conv1d = nn.Conv1d(in_channels=in_channels, out_channels=in_channels, 
+                                          kernel_size=kernel_size, padding=padding, groups=in_channels)
+        self.pointwise_conv1d = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, 
+                                          kernel_size=1, groups=1)
+        self.leaky_relu = nn.LeakyReLU()
+        self.dropout = nn.Dropout(p=drop_rate)
+
+    def forward(self, input: Tensor) -> Tensor:
+        input_dwconv1d = self.depthwise_conv1d(input.permute(0, 2, 1))
+        input_dwconv1d = self.leaky_relu(input_dwconv1d)
+        input_dwconv1d = self.dropout(input_dwconv1d)
+        output = self.pointwise_conv1d(input_dwconv1d).permute(0, 2, 1)
+
+        return output
 
 
 class RecurrentPositionEmbedding(nn.Module):
-    def __init__(self, embed_dim) -> None:
+    def __init__(self, embed_dim: int, drop_rate: float = 0.1) -> None:
         super(RecurrentPositionEmbedding, self).__init__()
-        self.gru = nn.GRU(input_size=embed_dim, hidden_size=embed_dim, num_layers=2, batch_first=True, dropout=0.1)
+        self.gru = nn.GRU(input_size=embed_dim, hidden_size=embed_dim, num_layers=2, batch_first=True, dropout=drop_rate)
     
     def forward(self, input: Tensor) -> Tensor:
         output, _ = self.gru(input)
@@ -39,7 +60,7 @@ class Embedding(nn.Module):
     def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, 
                  embed_dim, embed_drop_prob) -> None:
         super(Embedding, self).__init__()
-        assert pe_type in ['nope', 'spe', 'ape', 'rpe']
+        assert pe_type in ['nope', 'spe', 'ape', 'cpe', 'rpe']
 
         self.pe_type = pe_type
         self.vocab_size = vocab_size
@@ -54,6 +75,8 @@ class Embedding(nn.Module):
             self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
         elif pe_type == 'spe':
             self.pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
+        elif pe_type == 'cpe':
+            self.pos_embed = ConvolutionalPositionEmbedding(embed_dim, embed_dim, kernel_size=3)
         elif pe_type == 'rpe':
             self.pos_embed = RecurrentPositionEmbedding(embed_dim)
         self.embed_norm = ScaleNorm(embed_dim)
@@ -81,6 +104,10 @@ class Embedding(nn.Module):
             pos_ids = torch.arange(self.max_seq_len, dtype=torch.long, device=input.device)
             pos_ids = pos_ids.expand(input.size(0), self.max_seq_len)
             pos_embed = self.pos_embed(pos_ids)
+            embed = token_embed + pos_embed
+        elif self.pe_type == 'cpe':
+            # Convolutional Position Embedding
+            pos_embed = self.pos_embed(token_embed)
             embed = token_embed + pos_embed
         elif self.pe_type == 'rpe':
             # Recurrent Position Embedding

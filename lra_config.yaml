@@ -1,5 +1,5 @@
 listops:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
   vocab_size: 17 # 15 tokens + 1 PAD + 1 CLS
   embed_dim: 32
   max_seq_len: 2000
@@ -33,7 +33,7 @@ listops:
   num_workers: 2
 
 text:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
   vocab_size: 97 # 95 unique symbols + 1 PAD + 1 CLS
   embed_dim: 64
   max_seq_len: 4097
@@ -67,7 +67,7 @@ text:
   num_workers: 2
 
 image:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
   vocab_size: 256 # 256 unique pixel values
   embed_dim: 64
   max_seq_len: 1024
@@ -101,7 +101,7 @@ image:
   num_workers: 2
 
 pathfinder:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
   vocab_size: 225 # 225 unique pixel values
   embed_dim: 64
   max_seq_len: 1024
@@ -135,7 +135,7 @@ pathfinder:
   num_workers: 2
 
 retrieval:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
   vocab_size: 98 # 96 unique symbols + 1 PAD + 1 CLS
   embed_dim: 64
   max_seq_len: 4001
