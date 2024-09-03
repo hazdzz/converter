@@ -183,21 +183,22 @@ class SquaredReLU(nn.Module):
         return inplace_str
     
 class Squareplus(nn.Module):
-    __constants__ = ['bias', 'inplace']
+    __constants__ = ['bias', 'threshold', 'inplace']
     bias: float
+    threshold: float
     inplace: bool
 
-    def __init__(self, bias: float = 4 * (math.log(2) ** 2), inplace: bool = False):
+    def __init__(self, bias: float = 4 * (math.log(2) ** 2), threshold: float = 20.0, inplace: bool = False):
         super(Squareplus, self).__init__()
         self.bias = bias
+        self.threshold = threshold
         self.inplace = inplace
 
     def forward(self, input: Tensor) -> Tensor:
-        return cF.squareplus(input, self.bias, inplace=self.inplace)
+        return cF.squareplus(input, self.bias, self.threshold, inplace=self.inplace)
 
     def extra_repr(self) -> str:
-        inplace_str = ', inplace=True' if self.inplace else ''
-        return 'bias={}{}'.format(self.bias, inplace_str)
+        return f'bias={self.bias}, threshold={self.threshold}, inplace={self.inplace}'
     
 class DiracReLU(nn.Module):
     __constants__ = ['beta', 'inplace']

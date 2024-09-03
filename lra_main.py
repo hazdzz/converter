@@ -78,7 +78,7 @@ def prepare_model(args, device):
     else:
         model = wrapper.LRASingle(args).to(device)
 
-    loss_nll = nn.NLLLoss()
+    loss_cel = nn.CrossEntropyLoss()
     loss_seq_kp = los.KernelPolynomialLoss(batch_size=args.batch_size, max_order=args.max_order, eta=args.eta)
 
     es = early_stopping.EarlyStopping(delta=0.0, 
@@ -101,7 +101,7 @@ def prepare_model(args, device):
     
     scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=3, eta_min=0.0005)
 
-    return model, loss_nll, loss_seq_kp, optimizer, scheduler, es
+    return model, loss_cel, loss_seq_kp, optimizer, scheduler, es
 
 
 def prepare_data(args):
@@ -204,10 +204,10 @@ def prepare_data(args):
     return dataloader_train, dataloader_val, dataloader_test
 
 
-def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, device):
+def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_cel, loss_seq_kp, device):
     for _ in range(1, args.epochs + 1):
-        acc_train, loss_train, peak_memory_train = train(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
-        acc_val, loss_val = val(args, model, val_loader, loss_nll, loss_seq_kp, device)
+        acc_train, loss_train, peak_memory_train = train(args, model, optimizer, scheduler, train_loader, loss_cel, loss_seq_kp, device)
+        acc_val, loss_val = val(args, model, val_loader, loss_cel, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .4f}')
         print(f'val acc: {acc_val: .2f}%')
@@ -221,7 +221,7 @@ def run(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nl
     return acc_train, loss_train, acc_val, loss_val, peak_memory_train
 
 
-def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, device):
+def train(args, model, optimizer, scheduler, dataloader, loss_cel, loss_seq_kp, device):
     model.train()
 
     acc_meter = metrices.AverageMeter()
@@ -236,7 +236,7 @@ def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, 
         optimizer.zero_grad()
         preds = model(samples)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
-        loss = loss_nll(preds.squeeze(), targets)
+        loss = loss_cel(preds.squeeze(), targets)
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
@@ -256,7 +256,7 @@ def train(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, 
 
 
 @torch.no_grad()
-def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
+def val(args, model, dataloader, loss_cel, loss_seq_kp, device):
     model.eval()
 
     loss_meter = metrices.AverageMeter()
@@ -270,7 +270,7 @@ def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
         preds = model(samples)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
-        loss = loss_nll(preds.squeeze(), targets)
+        loss = loss_cel(preds.squeeze(), targets)
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
@@ -284,7 +284,7 @@ def val(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
 
 @torch.no_grad()
-def test(args, model, dataloader, loss_nll, loss_seq_kp, device):
+def test(args, model, dataloader, loss_cel, loss_seq_kp, device):
     model.load_state_dict(torch.load("converter_" + args.dataset + ".pt"))
     model.eval()
 
@@ -299,7 +299,7 @@ def test(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
         preds = model(samples)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
-        loss = loss_nll(preds.squeeze(), targets)
+        loss = loss_cel(preds.squeeze(), targets)
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
@@ -387,10 +387,10 @@ def prepare_data_retrieval(args):
     return dataloader_train, dataloader_val, dataloader_test
 
 
-def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_nll, loss_seq_kp, device):
+def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loader, loss_cel, loss_seq_kp, device):
     for _ in range(1, args.epochs + 1):
-        acc_train, loss_train, peak_memory_train = train_retrieval(args, model, optimizer, scheduler, train_loader, loss_nll, loss_seq_kp, device)
-        acc_val, loss_val = val_retrieval(args, model, val_loader, loss_nll, loss_seq_kp, device)
+        acc_train, loss_train, peak_memory_train = train_retrieval(args, model, optimizer, scheduler, train_loader, loss_cel, loss_seq_kp, device)
+        acc_val, loss_val = val_retrieval(args, model, val_loader, loss_cel, loss_seq_kp, device)
         print(f'train acc: {acc_train: .2f}%')
         print(f'train loss: {loss_train: .4f}')
         print(f'val acc: {acc_val: .2f}%')
@@ -404,7 +404,7 @@ def run_retrieval(args, model, optimizer, scheduler, es, train_loader, val_loade
     return acc_train, loss_train, acc_val, loss_val, peak_memory_train
 
 
-def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, loss_seq_kp, device):
+def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_cel, loss_seq_kp, device):
     model.train()
 
     acc_meter = metrices.AverageMeter()
@@ -420,7 +420,7 @@ def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, los
         optimizer.zero_grad()
         preds = model(samples_1, samples_2)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
-        loss = loss_nll(preds.squeeze(), targets)
+        loss = loss_cel(preds.squeeze(), targets)
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
@@ -440,7 +440,7 @@ def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_nll, los
 
 
 @torch.no_grad()
-def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
+def val_retrieval(args, model, dataloader, loss_cel, loss_seq_kp, device):
     model.eval()
 
     loss_meter = metrices.AverageMeter()
@@ -455,7 +455,7 @@ def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
         preds = model(samples_1, samples_2)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
-        loss = loss_nll(preds.squeeze(), targets)
+        loss = loss_cel(preds.squeeze(), targets)
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
@@ -470,7 +470,7 @@ def val_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
 
 @torch.no_grad()
-def test_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
+def test_retrieval(args, model, dataloader, loss_cel, loss_seq_kp, device):
     model.load_state_dict(torch.load("converter_" + args.dataset + ".pt"))
     model.eval()
 
@@ -486,7 +486,7 @@ def test_retrieval(args, model, dataloader, loss_nll, loss_seq_kp, device):
 
         preds = model(samples_1, samples_2)
         acc = torch.tensor(metrices.accuracy(preds.squeeze(), targets))
-        loss = loss_nll(preds.squeeze(), targets)
+        loss = loss_cel(preds.squeeze(), targets)
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
@@ -507,7 +507,7 @@ if __name__ == '__main__':
     warnings.filterwarnings("ignore", category=UserWarning)
 
     args, device = get_parameters()
-    model, loss_nll, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
+    model, loss_cel, loss_seq_kp, optimizer, scheduler, es = prepare_model(args, device)
     if args.dataset == 'retrieval':
         dataloader_train, dataloader_val, dataloader_test = prepare_data_retrieval(args)
         acc_train, loss_train, acc_val, loss_val, peak_memory_train = run_retrieval(args, 
@@ -517,25 +517,22 @@ if __name__ == '__main__':
                                                                  es, 
                                                                  dataloader_train, 
                                                                  dataloader_val,  
-                                                                 loss_nll, 
+                                                                 loss_cel, 
                                                                  loss_seq_kp, 
-                                                                 device
-                                                                )
+                                                                 device)
         acc_test, loss_test = test_retrieval(args, model, dataloader_test, 
-                                             loss_nll, loss_seq_kp, 
-                                             device
-                                            )
+                                             loss_cel, loss_seq_kp, 
+                                             device)
     else:
         dataloader_train, dataloader_val, dataloader_test = prepare_data(args)
         acc_train, loss_train, acc_val, loss_val, peak_memory_train = run(args, model, 
                                                        optimizer, scheduler, 
                                                        es, dataloader_train, 
-                                                       dataloader_val, loss_nll, 
-                                                       loss_seq_kp, device
-                                                    )
-        acc_test, loss_test = test(args, model, dataloader_test, loss_nll, 
+                                                       dataloader_val, loss_cel, 
+                                                       loss_seq_kp, device)
+        acc_test, loss_test = test(args, model, dataloader_test, loss_cel, 
                                    loss_seq_kp, device)
 
     print(f'test acc: {acc_test: .2f}%')
     print(f'test loss: {loss_test: .4f}')
-    print(f"Peak memory usage in traing: {peak_memory_train / 1024 / 1024 / 1024:.2f} GiB")
+    print(f"Peak memory usage in traing: {peak_memory_train / (1024 ** 3):.2f} GiB")

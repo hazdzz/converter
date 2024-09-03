@@ -1,5 +1,5 @@
 listops:
-  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
   vocab_size: 17 # 15 tokens + 1 PAD + 1 CLS
   embed_dim: 32
   max_seq_len: 2000
@@ -19,6 +19,7 @@ listops:
   interaction: "None"
   enable_cuda: true
   device_id: 0
+  pe_drop_prob: 0.1
   embed_drop_prob: 0.1
   eigenvalue_drop_prob: 0.0
   value_drop_prob: 0.1
@@ -26,19 +27,19 @@ listops:
   batch_size: 64
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.1
+  eta: 0.01
   epochs: 100
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 4
+  patience: 5
   num_workers: 2
 
 text:
-  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
   vocab_size: 97 # 95 unique symbols + 1 PAD + 1 CLS
   embed_dim: 64
   max_seq_len: 4097
   enable_kpm: true
-  enable_kploss: false
+  enable_kploss: true
   kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
   max_order: 2
   mu: 3
@@ -53,6 +54,7 @@ text:
   interaction: "None"
   enable_cuda: true
   device_id: 0
+  pe_drop_prob: 0.1
   embed_drop_prob: 0.1
   eigenvalue_drop_prob: 0.0
   value_drop_prob: 0.1
@@ -60,14 +62,14 @@ text:
   batch_size: 32
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.001
+  eta: 0.0001
   epochs: 60
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 4
+  patience: 5
   num_workers: 2
 
 image:
-  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
   vocab_size: 256 # 256 unique pixel values
   embed_dim: 64
   max_seq_len: 1024
@@ -87,6 +89,7 @@ image:
   interaction: "None"
   enable_cuda: true
   device_id: 0 # single GPU
+  pe_drop_prob: 0.1
   embed_drop_prob: 0.1
   eigenvalue_drop_prob: 0.0
   value_drop_prob: 0.1
@@ -101,7 +104,7 @@ image:
   num_workers: 2
 
 pathfinder:
-  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
   vocab_size: 225 # 225 unique pixel values
   embed_dim: 64
   max_seq_len: 1024
@@ -121,6 +124,7 @@ pathfinder:
   interaction: "None"
   enable_cuda: true
   device_id: 0
+  pe_drop_prob: 0.1
   embed_drop_prob: 0.1
   eigenvalue_drop_prob: 0.0
   value_drop_prob: 0.1
@@ -128,19 +132,19 @@ pathfinder:
   batch_size: 128
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.01
+  eta: 0.1
   epochs: 60
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
   patience: 2
   num_workers: 2
 
 retrieval:
-  pe_type: "rpe" # "nope", "spe", "ape", "cpe", or "rpe"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
   vocab_size: 98 # 96 unique symbols + 1 PAD + 1 CLS
   embed_dim: 64
   max_seq_len: 4001
   enable_kpm: true
-  enable_kploss: false
+  enable_kploss: true
   kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
   max_order: 2
   mu: 3
@@ -155,6 +159,7 @@ retrieval:
   interaction: "NLI" # "NLI" or "CAT"
   enable_cuda: true
   device_id: 0
+  pe_drop_prob: 0.1
   embed_drop_prob: 0.1
   eigenvalue_drop_prob: 0.0
   value_drop_prob: 0.1
@@ -162,7 +167,7 @@ retrieval:
   batch_size: 128
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.1
+  eta: 0.01
   epochs: 30
   optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
   patience: 2

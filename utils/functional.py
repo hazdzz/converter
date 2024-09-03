@@ -129,13 +129,15 @@ def sqrrelu(input: Tensor, inplace: bool = False) -> Tensor:
         sqr_relu = F.relu(input=input, inplace=inplace) ** 2
         return sqr_relu
 
-def squareplus(input: Tensor, bias: float = 4 * (math.log(2) ** 2), inplace: bool = False) -> Tensor:
+def squareplus(input: Tensor, bias: float = 4 * (math.log(2) ** 2), threshold: float = 20.0, inplace: bool = False) -> Tensor:
     if inplace:
-        input = (torch.sqrt(torch.pow(input, 2) + bias) + input) / 2
-        return input
+        result = input
     else:
-        squareplus = (torch.sqrt(torch.pow(input, 2) + bias) + input) / 2
-        return squareplus
+        result = input.clone()
+    mask = result < threshold
+    result[mask] = (torch.sqrt(torch.pow(result[mask], 2) + bias) + result[mask]) / 2
+
+    return result
     
 def diracrelu(input: Tensor, beta: float = 1.0, inplace: bool = False) -> Tensor:
     if inplace:

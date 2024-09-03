@@ -5,34 +5,46 @@ import torch.nn.init as init
 from torch import Tensor
 
 
+class Sine(nn.Module):
+    def __init__(self) -> None:
+        super(Sine, self).__init__()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return torch.sin(x)
+
+
 class GenerateEigenvalue(nn.Module):
-    def __init__(self, batch_size, length, feat_dim, pool_dim, target_size, eigenvalue_drop_prob) -> None:
+    def __init__(self, batch_size, length, feat_dim, pool_dim, target_size, drop_prob) -> None:
         super(GenerateEigenvalue, self).__init__()
         self.batch_size = batch_size
         self.length = length
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
-        self.linear = nn.Linear(feat_dim, feat_dim, bias=True)
+        self.siren = nn.Sequential(
+            nn.Linear(feat_dim, feat_dim, bias=True),
+            Sine(),
+            nn.Dropout(p=drop_prob),
+            nn.Linear(feat_dim, feat_dim, bias=True),
+            Sine()
+        )
         self.avgpool1d = nn.AvgPool1d(kernel_size=target_size)
-        self.eigenvalue_dropout = nn.Dropout(p=eigenvalue_drop_prob)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         bound = math.sqrt(6 / self.feat_dim)
-        init.uniform_(self.linear.weight, a=-bound, b=bound)
-        init.zeros_(self.linear.bias)
+        init.uniform_(self.siren[0].weight, a=-bound, b=bound)
+        init.uniform_(self.siren[3].weight, a=-bound, b=bound)
+        init.zeros_(self.siren[0].bias)
+        init.zeros_(self.siren[3].bias)
 
     def forward(self, input: Tensor) -> Tensor:
-        input_linear = self.linear(input)
-        input_linear = torch.sin(input_linear)
+        input_linear = self.siren(input)
 
         if self.pool_dim == -1 or self.pool_dim == 2:
             eigenvalue = self.avgpool1d(input_linear).view(self.batch_size, self.length)
         else:
             eigenvalue = self.avgpool1d(input_linear.permute(0, 2 ,1)).view(self.batch_size, self.feat_dim)
-
-        eigenvalue = self.eigenvalue_dropout(eigenvalue)
 
         return eigenvalue
 
@@ -59,7 +71,8 @@ class KernelPolynomial(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.ones_(self.cheb_coef)
+        init.constant_(self.cheb_coef, 2 / (self.max_order + 1))
+        init.constant_(self.cheb_coef[:, 0], 1 / (self.max_order + 1))
         init.ones_(self.gibbs_damp)
 
         if self.kernel_type == 'fejer':
@@ -110,17 +123,16 @@ class KernelPolynomial(nn.Module):
 
     def forward(self, seq: Tensor) -> Tensor:
         gibbs_damp = self.gibbs_damp.to(seq.device)
-        cheb_coef = self.cheb_coef * 2 / (self.max_order + 1)
 
         # Tx_0 = 1
         Tx_0 = torch.ones_like(seq)
-        ChebGibbs = cheb_coef[:, 0].unsqueeze(1) * 0.5
+        ChebGibbs = self.cheb_coef[:, 0].unsqueeze(1)
         if self.max_order == 0:
             return ChebGibbs
 
         # Tx_1 = x
         Tx_1 = seq
-        ChebGibbs = ChebGibbs + Tx_1 * cheb_coef[:, 1].unsqueeze(1) * gibbs_damp[:, 1].unsqueeze(1)
+        ChebGibbs = ChebGibbs + Tx_1 * self.cheb_coef[:, 1].unsqueeze(1) * gibbs_damp[:, 1].unsqueeze(1)
         if self.max_order == 1:
             return ChebGibbs
 
@@ -128,7 +140,7 @@ class KernelPolynomial(nn.Module):
             for k in range(2, self.max_order + 1):
                 # Tx_2 = 2x * Tx_1 - Tx_0 
                 Tx_2 = 2.0 * seq * Tx_1 - Tx_0
-                ChebGibbs = ChebGibbs + Tx_2 * cheb_coef[:, k].unsqueeze(1) * gibbs_damp[:, k].unsqueeze(1)
+                ChebGibbs = ChebGibbs + Tx_2 * self.cheb_coef[:, k].unsqueeze(1) * gibbs_damp[:, k].unsqueeze(1)
                 Tx_0, Tx_1 = Tx_1, Tx_2
 
         return ChebGibbs

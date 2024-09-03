@@ -1,8 +1,7 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from .converter import Converter
+from . import embedding, linformer
 from torch import Tensor
 
 
@@ -118,7 +117,13 @@ class DualClassifier(nn.Module):
 class LRASingle(nn.Module):
     def __init__(self, args) -> None:
         super(LRASingle, self).__init__()
-        self.converter = Converter(args)
+        self.embedding = embedding.Embedding(args.pe_type, 
+                                             args.pooling_type, 
+                                             args.vocab_size, 
+                                             args.max_seq_len, 
+                                             args.embed_size, 
+                                             args.embed_drop_prob)
+        self.linformer = linformer.Linformer(args)
         self.classifier = SingleClassifier(args.pooling_type, 
                                            args.max_seq_len, 
                                            args.encoder_dim, 
@@ -127,7 +132,8 @@ class LRASingle(nn.Module):
                                            )
 
     def forward(self, input: Tensor) -> Tensor:
-        encoded = self.converter(input)
+        embeded = self.embedding(input)
+        encoded = self.linformer(embeded)
         classified = self.classifier(encoded)
 
         return classified
@@ -136,7 +142,13 @@ class LRASingle(nn.Module):
 class LRADual(nn.Module):
     def __init__(self, args) -> None:
         super(LRADual, self).__init__()
-        self.converter = Converter(args)
+        self.embedding = embedding.Embedding(args.pe_type, 
+                                             args.pooling_type, 
+                                             args.vocab_size, 
+                                             args.max_seq_len, 
+                                             args.embed_size, 
+                                             args.embed_drop_prob)
+        self.linformer = linformer.Linformer(args)
         self.classifier = DualClassifier(args.pooling_type, 
                                          args.max_seq_len, 
                                          args.encoder_dim, 
@@ -146,8 +158,10 @@ class LRADual(nn.Module):
                                          )
 
     def forward(self, input1: Tensor, input2: Tensor) -> Tensor:
-        encoded1 = self.converter(input1)
-        encoded2 = self.converter(input2)
+        embeded1 = self.embedding(input1)
+        embeded2 = self.embedding(input2)
+        encoded1 = self.linformer(embeded1)
+        encoded2 = self.linformer(embeded2)
         classified = self.classifier(encoded1, encoded2)
 
         return classified

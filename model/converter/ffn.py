@@ -9,7 +9,6 @@ class BilinearFeedForward(nn.Module):
     def __init__(self, length, feat_dim, bffn_drop_prob) -> None:
         super(BilinearFeedForward, self).__init__()
         self.length = length
-        self.feat_dim = feat_dim
         self.query_real_linear = nn.Linear(feat_dim, feat_dim, bias=True)
         self.query_imag_linear = nn.Linear(feat_dim, feat_dim, bias=True)
         self.key_linear = nn.Linear(feat_dim, feat_dim, bias=True)
@@ -30,20 +29,20 @@ class BilinearFeedForward(nn.Module):
         init.zeros_(self.key_linear.bias)
         init.zeros_(self.value_linear.bias)
 
-    def forward(self, x) -> Tensor:
-        if torch.is_complex(x):
-            x_real, x_imag = x.real, x.imag
+    def forward(self, input: Tensor) -> Tensor:
+        if torch.is_complex(input):
+            input_real, input_imag = input.real, input.imag
         else:
-            x_real, x_imag = x, x
+            input_real, input_imag = input, input
         
-        query_real = self.query_real_linear(x_real)
-        query_imag = self.query_imag_linear(x_imag)
+        query_real = self.query_real_linear(input_real)
+        query_imag = self.query_imag_linear(input_imag)
 
         query = torch.mul(query_real, torch.tanh(self.softplus(query_imag)))
         query = self.bffn_dropout(query)
 
-        key = self.key_linear(x_real)
-        value = self.value_linear(x_imag)
+        key = self.key_linear(input_real)
+        value = self.value_linear(input_imag)
 
         key_norm = key / (torch.norm(key, dim=1, keepdim=True) + 1e-5)
         value_norm = value / (torch.norm(value, dim=1, keepdim=True) + 1e-5)

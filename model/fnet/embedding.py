@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from .norm import ScaleNorm
 from torch import Tensor
 
 
@@ -24,22 +23,11 @@ class SinusoidalPositionEmbedding(nn.Module):
         return self.pe[:, :input.size(1)].to(input.device)
 
 
-class RecurrentPositionEmbedding(nn.Module):
-    def __init__(self, embed_dim: int, num_layers: int = 2, drop_rate: float = 0.1) -> None:
-        super(RecurrentPositionEmbedding, self).__init__()
-        self.gru = nn.GRU(input_size=embed_dim, hidden_size=embed_dim, num_layers=num_layers, batch_first=True, dropout=drop_rate)
-    
-    def forward(self, input: Tensor) -> Tensor:
-        output, _ = self.gru(input)
-
-        return output
-
-
 class Embedding(nn.Module):
-    def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, 
-                 embed_dim, pe_drop_prob, embed_drop_prob) -> None:
+    def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, embed_dim, 
+                 embed_drop_prob) -> None:
         super(Embedding, self).__init__()
-        assert pe_type in ['nope', 'spe', 'ape', 'cpe', 'rpe']
+        assert pe_type in ['nope', 'spe', 'ape']
 
         self.pe_type = pe_type
         self.vocab_size = vocab_size
@@ -49,14 +37,16 @@ class Embedding(nn.Module):
             padding_idx = vocab_size - 2
         else:
             padding_idx = None
-        self.token_embed = nn.Embedding(vocab_size, embed_dim, padding_idx)
+        self.token_embed = nn.Embedding(
+                            vocab_size,
+                            embed_dim,
+                            padding_idx
+                        )
         if pe_type == 'ape':
             self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
         elif pe_type == 'spe':
             self.pos_embed = SinusoidalPositionEmbedding(max_seq_len, embed_dim)
-        elif pe_type == 'rpe':
-            self.pos_embed = RecurrentPositionEmbedding(embed_dim, num_layers=2, drop_rate=pe_drop_prob)
-        self.embed_norm = ScaleNorm(embed_dim)
+        self.embed_norm = nn.LayerNorm(embed_dim)
         self.embed_dropout = nn.Dropout(p=embed_drop_prob)
 
         self.reset_parameters()
@@ -65,10 +55,9 @@ class Embedding(nn.Module):
         init.normal_(self.token_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
         if self.pe_type == 'ape':
             init.normal_(self.pos_embed.weight, mean=0, std=math.sqrt(1 / self.max_seq_len))
-
+    
     def forward(self, input: Tensor) -> Tensor:
         token_embed = self.token_embed(input)
-        
         if self.pe_type == 'nope':
             # No Position Embedding
             embed = token_embed
@@ -82,13 +71,9 @@ class Embedding(nn.Module):
             pos_ids = pos_ids.expand(input.size(0), self.max_seq_len)
             pos_embed = self.pos_embed(pos_ids)
             embed = token_embed + pos_embed
-        elif self.pe_type == 'rpe':
-            # Recurrent Position Embedding
-            pos_embed = self.pos_embed(token_embed)
-            embed = token_embed + pos_embed
         else:
             raise ValueError(f'ERROR: The Position Embedding {self.pe_type} is not implemented yet.')
-
+        
         embed = self.embed_norm(embed)
         embed = self.embed_dropout(embed)
 

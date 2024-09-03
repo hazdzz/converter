@@ -15,7 +15,6 @@ class KernelPolynomialLoss(nn.Module):
         self.eta = eta
 
     def forward(self, cheb_coef: Tensor) -> Tensor:
-        cheb_coef = cheb_coef * 2 / (self.max_order + 1)
         order = torch.arange(0, self.max_order + 1, device=cheb_coef.device, dtype=cheb_coef.dtype).unsqueeze(0).repeat(self.batch_size, 1)
 
         loss = torch.sum(cheb_coef.pow(2) * order.pow(2), dim=-1) * math.pi * self.eta

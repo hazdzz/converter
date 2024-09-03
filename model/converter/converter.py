@@ -12,6 +12,7 @@ class Converter(nn.Module):
                                              args.vocab_size, 
                                              args.max_seq_len, 
                                              args.embed_dim, 
+                                             args.pe_drop_prob, 
                                              args.embed_drop_prob)
         self.chsyconv = chsyconv.ChsyConv(args.batch_size, 
                                           args.max_seq_len, 
