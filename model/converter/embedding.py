@@ -39,7 +39,7 @@ class Embedding(nn.Module):
     def __init__(self, pe_type, pooling_type, vocab_size, max_seq_len, 
                  embed_dim, pe_drop_prob, embed_drop_prob) -> None:
         super(Embedding, self).__init__()
-        assert pe_type in ['nope', 'spe', 'ape', 'cpe', 'rpe']
+        assert pe_type in ['nope', 'spe', 'ape', 'rpe']
 
         self.pe_type = pe_type
         self.vocab_size = vocab_size

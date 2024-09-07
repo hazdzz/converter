@@ -5,12 +5,13 @@ listops:
   max_seq_len: 2000
   enable_kpm: true
   enable_kploss: true
-  kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
+  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
   max_order: 2
   mu: 3
   xi: 4.0
   stigma: 0.5
   heta: 2
+  act_func: "glu" # "glu", "gtu", or "bilinear"
   dataset: "listops"
   pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 32
@@ -29,7 +30,7 @@ listops:
   weight_decay: 0.001
   eta: 0.01
   epochs: 100
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
+  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
   patience: 5
   num_workers: 2
 
@@ -39,13 +40,14 @@ text:
   embed_dim: 64
   max_seq_len: 4097
   enable_kpm: true
-  enable_kploss: true
-  kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
+  enable_kploss: false
+  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
   max_order: 2
   mu: 3
   xi: 4.0
   stigma: 0.5
   heta: 2
+  act_func: "glu" # "glu", "gtu", or "bilinear"
   dataset: "text"
   pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -62,9 +64,9 @@ text:
   batch_size: 32
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.0001
+  eta: 0.00001
   epochs: 60
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
+  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
   patience: 5
   num_workers: 2
 
@@ -75,12 +77,13 @@ image:
   max_seq_len: 1024
   enable_kpm: true
   enable_kploss: true
-  kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
+  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
   max_order: 2
   mu: 3
   xi: 4.0
   stigma: 0.5
   heta: 2
+  act_func: "glu" # "glu", "gtu", or "bilinear"
   dataset: "image"
   pooling_type: "FLATTEN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -99,8 +102,8 @@ image:
   weight_decay: 0.001
   eta: 0.1
   epochs: 30
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
-  patience: 1
+  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
+  patience: 3
   num_workers: 2
 
 pathfinder:
@@ -110,12 +113,13 @@ pathfinder:
   max_seq_len: 1024
   enable_kpm: true
   enable_kploss: true
-  kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
+  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
   max_order: 2
   mu: 3
   xi: 4.0
   stigma: 0.5
   heta: 2
+  act_func: "glu" # "glu", "gtu", or "bilinear"
   dataset: "pathfinder"
   pooling_type: "FLATTEN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -134,7 +138,7 @@ pathfinder:
   weight_decay: 0.001
   eta: 0.1
   epochs: 60
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
+  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
   patience: 2
   num_workers: 2
 
@@ -145,12 +149,13 @@ retrieval:
   max_seq_len: 4001
   enable_kpm: true
   enable_kploss: true
-  kernel_type: "none" # 'none', 'dirichlet', 'fejer', 'jackson', 'lanczos', 'lorentz', 'vekic', or 'wang'
+  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
   max_order: 2
   mu: 3
   xi: 4.0
   stigma: 0.5
   heta: 2
+  act_func: "glu" # "glu", "gtu", or "bilinear"
   dataset: "retrieval"
   pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -169,6 +174,6 @@ retrieval:
   weight_decay: 0.001
   eta: 0.01
   epochs: 30
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", or "sophia"
+  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
   patience: 2
   num_workers: 2

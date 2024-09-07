@@ -26,9 +26,9 @@ class Converter(nn.Module):
                                           args.xi, 
                                           args.stigma, 
                                           args.heta)
-        self.bffn = ffn.BilinearFeedForward(args.max_seq_len, args.embed_dim, args.bffn_drop_prob)
+        self.gffn = ffn.GatedFeedForward(args.max_seq_len, args.embed_dim, args.act_func, args.bffn_drop_prob)
         self.chsyconv_norm = norm.ScaleNorm(args.embed_dim)
-        self.bffn_norm = norm.ScaleNorm(args.embed_dim)
+        self.gffn_norm = norm.ScaleNorm(args.embed_dim)
         self.alpha = nn.Parameter(torch.ones(1))
 
     def forward(self, input: Tensor) -> Tensor:
@@ -39,7 +39,7 @@ class Converter(nn.Module):
         chsyconv = self.chsyconv(embed) + embed
         chsyconv_normed = self.chsyconv_norm(chsyconv)
 
-        bffn = self.bffn(chsyconv_normed) + alpha * chsyconv_normed.real + (1.0 - alpha) * chsyconv_normed.imag
-        bffn_norm = self.bffn_norm(bffn)
+        gffn = self.gffn(chsyconv_normed) + alpha * chsyconv_normed.real + (1.0 - alpha) * chsyconv_normed.imag
+        gffn_norm = self.gffn_norm(gffn)
 
-        return bffn_norm
+        return gffn_norm

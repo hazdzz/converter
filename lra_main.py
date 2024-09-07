@@ -96,6 +96,8 @@ def prepare_model(args, device):
         optimizer = opt.Lion(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'sophia':
         optimizer = opt.SophiaG(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'ademamix':
+        optimizer = opt.AdEMAMix(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         raise ValueError(f'ERROR: The {args.optimizer} optimizer is undefined.')
     
