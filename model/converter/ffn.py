@@ -20,6 +20,7 @@ class GatedFeedForward(nn.Module):
         self.softplus = nn.Softplus()
         self.mish = nn.Mish()
         self.relu = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)
 
         self.reset_parameters()
 
@@ -64,6 +65,7 @@ class GatedFeedForward(nn.Module):
         kv_attn = torch.einsum('bnd,bne->bde', key_norm, value_norm)
         kv_attn = self.relu(kv_attn)
         # kv_attn = self.softplus(kv_attn)
+        # kv_attn = self.softmax(kv_attn)
         gffn = torch.einsum('bnd,bde->bne', query, kv_attn)
 
         return gffn
