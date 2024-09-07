@@ -18,9 +18,7 @@ class GatedFeedForward(nn.Module):
         self.bffn_dropout = nn.Dropout(p=bffn_drop_prob)
         self.act_func = act_func
         self.softplus = nn.Softplus()
-        self.mish = nn.Mish()
         self.relu = nn.ReLU()
-        self.softmax = nn.Softmax(dim=-1)
 
         self.reset_parameters()
 
@@ -52,7 +50,7 @@ class GatedFeedForward(nn.Module):
             # we found that sigmoid is what hinders back-propagation.
             query = torch.mul(torch.tanh(query_real), self.softplus(query_imag))
         else:
-            query = self.mish(torch.mul(query_real, query_imag))
+            query = torch.mul(query_real, query_imag)
 
         query = self.bffn_dropout(query)
 
@@ -64,8 +62,6 @@ class GatedFeedForward(nn.Module):
 
         kv_attn = torch.einsum('bnd,bne->bde', key_norm, value_norm)
         kv_attn = self.relu(kv_attn)
-        # kv_attn = self.softplus(kv_attn)
-        # kv_attn = self.softmax(kv_attn)
         gffn = torch.einsum('bnd,bde->bne', query, kv_attn)
 
         return gffn
