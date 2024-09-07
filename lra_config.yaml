@@ -30,7 +30,7 @@ listops:
   weight_decay: 0.001
   eta: 0.01
   epochs: 100
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
+  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
   patience: 5
   num_workers: 2
 
@@ -66,7 +66,7 @@ text:
   weight_decay: 0.001
   eta: 0.00001
   epochs: 60
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
+  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
   patience: 5
   num_workers: 2
 
@@ -102,7 +102,7 @@ image:
   weight_decay: 0.001
   eta: 0.1
   epochs: 30
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
+  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
   patience: 3
   num_workers: 2
 
@@ -138,7 +138,7 @@ pathfinder:
   weight_decay: 0.001
   eta: 0.1
   epochs: 60
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
+  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
   patience: 2
   num_workers: 2
 
@@ -174,6 +174,6 @@ retrieval:
   weight_decay: 0.001
   eta: 0.01
   epochs: 30
-  optimizer: "nadamw" # "adamw", "nadamw", "adan", "lion", "sophia", or "ademamix"
+  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
   patience: 2
   num_workers: 2

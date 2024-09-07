@@ -90,12 +90,6 @@ def prepare_model(args, device):
         optimizer = optim.AdamW(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'nadamw': # default
         optimizer = optim.NAdam(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay, decoupled_weight_decay=True)
-    elif args.optimizer == 'adan':
-        optimizer = opt.Adan(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optimizer == 'lion':
-        optimizer = opt.Lion(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    elif args.optimizer == 'sophia':
-        optimizer = opt.SophiaG(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == 'ademamix':
         optimizer = opt.AdEMAMix(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
