@@ -3,13 +3,31 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from utils import activation as act
+from typing import Optional
 from torch import Tensor
+
+
+class BinaryGatingUnit(nn.Module):
+    def __init__(self) -> None:
+        super(BinaryGatingUnit, self).__init__()
+
+    def forward(self, input1: Tensor, input2: Optional[Tensor] = None) -> Tensor:
+        if input2 is None:
+            input2 = input1
+
+        p = 0.5 * (1.0 + torch.erf(input2 / math.sqrt(2.0)))
+        bern = torch.bernoulli(p)
+        eps = torch.where(bern == 1, 1 - p, -p)
+        gate = p + eps
+        bgu = input1 * gate
+
+        return bgu
 
 
 class GatedFeedForward(nn.Module):
     def __init__(self, length, feat_dim, act_func: str = 'glu', bffn_drop_prob: float = 0.1) -> None:
         super(GatedFeedForward, self).__init__()
-        assert act_func in ['glu', 'gtu', 'bilinear']
+        assert act_func in ['glu', 'gtu', 'bilinear', 'bgu']
         
         self.length = length
         self.value_real_linear = nn.Linear(feat_dim, feat_dim, bias=True)
@@ -18,6 +36,7 @@ class GatedFeedForward(nn.Module):
         self.query_linear = nn.Linear(feat_dim, feat_dim, bias=True)
         self.bffn_dropout = nn.Dropout(p=bffn_drop_prob)
         self.act_func = act_func
+        self.bgu = BinaryGatingUnit()
         self.softplus = nn.Softplus()
         self.relu = nn.ReLU()
         self.smu = act.SMU()
@@ -51,8 +70,10 @@ class GatedFeedForward(nn.Module):
             # Unlike Dauphin et al. who think tanh hinders back-propagation,
             # we found that sigmoid is what hinders back-propagation.
             value = torch.mul(torch.tanh(value_real), self.softplus(value_imag))
-        else:
+        elif self.act_func == 'bilinear':
             value = torch.mul(value_real, value_imag)
+        else:
+            value = self.bgu(value_real, value_imag)
 
         value = self.bffn_dropout(value)
 
