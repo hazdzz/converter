@@ -216,6 +216,16 @@ class DiracReLU(nn.Module):
     def extra_repr(self) -> str:
         inplace_str = ', inplace=True' if self.inplace else ''
         return 'bias={}{}'.format(self.bias, inplace_str)
+    
+class SMU(nn.Module):
+    def __init__(self, alpha: float = 0.0, beta: float = 1.0, inplace: bool = False) -> None:
+        super(SMU, self).__init__()
+        self.alpha = alpha
+        self.beta = nn.Parameter(torch.tensor(beta))
+        self.inplace = inplace
+        
+    def forward(self, input: Tensor) -> Tensor:
+        return cF.smu(input, self.alpha, self.beta, self.inplace)
 
 class LipGELU(nn.Module):
     __constants__ = ['approximate']

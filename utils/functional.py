@@ -152,6 +152,14 @@ def diracrelu(input: Tensor, beta: float = 1.0, inplace: bool = False) -> Tensor
         term3 = math.sqrt(2.0 / math.pi) * beta * torch.exp(-input ** 2 / (2 * beta ** 2))
         diracrelu = 0.5 * (term1 + term2 + term3)
         return diracrelu
+    
+def smu(input: Tensor, alpha: float, beta: Tensor, inplace: bool = False):
+    if inplace:
+        input = ((1 + alpha) * input + (1 - alpha) * input * torch.erf(beta * (1 - alpha) * input)) / 2
+        return input
+    else:
+        smu = ((1 + alpha) * input + (1 - alpha) * input * torch.erf(beta * (1 - alpha) * input)) / 2
+        return smu
 
 def lip_gelu(input: Tensor, approximate: str = 'none') -> Tensor:
     lip_gelu = F.gelu(input=input, approximate=approximate) / 1.129

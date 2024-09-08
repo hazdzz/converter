@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+from utils import activation as act
 from torch import Tensor
 
 
@@ -19,6 +20,7 @@ class GatedFeedForward(nn.Module):
         self.act_func = act_func
         self.softplus = nn.Softplus()
         self.relu = nn.ReLU()
+        self.smu = act.SMU()
 
         self.reset_parameters()
 
@@ -61,7 +63,8 @@ class GatedFeedForward(nn.Module):
         query_norm = query / (torch.norm(query, dim=1, keepdim=True) + 1e-5)
 
         feature_attn = torch.einsum('bnd,bne->bde', key_norm, query_norm)
-        feature_attn = self.relu(feature_attn)
+        # feature_attn = self.relu(feature_attn)
+        feature_attn = self.smu(feature_attn)
         
         gffn = torch.einsum('bnd,bde->bne', value, feature_attn)
 
