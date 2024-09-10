@@ -11,7 +11,7 @@ listops:
   xi: 4.0
   stigma: 0.5
   heta: 2
-  act_func: "glu" # "glu", "gtu", or "bilinear"
+  act_func: "glu" # "glu", "gtu", "bilinear", or "bgu"
   dataset: "listops"
   pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 32
@@ -30,7 +30,7 @@ listops:
   weight_decay: 0.001
   eta: 0.01
   epochs: 100
-  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 5
   num_workers: 2
 
@@ -47,7 +47,7 @@ text:
   xi: 4.0
   stigma: 0.5
   heta: 2
-  act_func: "glu" # "glu", "gtu", or "bilinear"
+  act_func: "glu" # "glu", "gtu", "bilinear", or "bgu"
   dataset: "text"
   pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -66,7 +66,7 @@ text:
   weight_decay: 0.001
   eta: 0.00001
   epochs: 60
-  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 5
   num_workers: 2
 
@@ -83,7 +83,7 @@ image:
   xi: 4.0
   stigma: 0.5
   heta: 2
-  act_func: "glu" # "glu", "gtu", or "bilinear"
+  act_func: "glu" # "glu", "gtu", "bilinear", or "bgu"
   dataset: "image"
   pooling_type: "FLATTEN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -102,7 +102,7 @@ image:
   weight_decay: 0.001
   eta: 0.1
   epochs: 30
-  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 3
   num_workers: 2
 
@@ -119,7 +119,7 @@ pathfinder:
   xi: 4.0
   stigma: 0.5
   heta: 2
-  act_func: "glu" # "glu", "gtu", or "bilinear"
+  act_func: "glu" # "glu", "gtu", "bilinear", or "bgu"
   dataset: "pathfinder"
   pooling_type: "FLATTEN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -138,7 +138,7 @@ pathfinder:
   weight_decay: 0.001
   eta: 0.1
   epochs: 60
-  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 2
   num_workers: 2
 
@@ -148,14 +148,14 @@ retrieval:
   embed_dim: 64
   max_seq_len: 4001
   enable_kpm: true
-  enable_kploss: true
+  enable_kploss: false
   kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
   max_order: 2
   mu: 3
   xi: 4.0
   stigma: 0.5
   heta: 2
-  act_func: "glu" # "glu", "gtu", or "bilinear"
+  act_func: "glu" # "glu", "gtu", "bilinear", or "bgu"
   dataset: "retrieval"
   pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
@@ -174,6 +174,6 @@ retrieval:
   weight_decay: 0.001
   eta: 0.01
   epochs: 30
-  optimizer: "nadamw" # "adamw", "nadamw", or "ademamix"
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 2
   num_workers: 2

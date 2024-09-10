@@ -15,7 +15,9 @@ class BinaryGatingUnit(nn.Module):
         if input2 is None:
             input2 = input1
 
-        p = 0.5 * (1.0 + torch.erf(input2 / math.sqrt(2.0)))
+        p = torch.sigmoid(input2)
+        # p = 0.5 * (1.0 + torch.tanh(0.5 * input2))
+        # p = 0.5 * (1.0 + torch.erf(input2 / math.sqrt(2.0)))
         bern = torch.bernoulli(p)
         eps = torch.where(bern == 1, 1 - p, -p)
         gate = p + eps
