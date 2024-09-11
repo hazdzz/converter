@@ -8,16 +8,23 @@ from torch import Tensor
 
 
 class BinaryGatingUnit(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, base_func: str = 'sigmoid') -> None:
         super(BinaryGatingUnit, self).__init__()
+        assert base_func in ['sigmoid', 'tanh', 'erf']
+        self.base_func = base_func
 
     def forward(self, input1: Tensor, input2: Optional[Tensor] = None) -> Tensor:
         if input2 is None:
             input2 = input1
 
-        p = torch.sigmoid(input2)
-        # p = 0.5 * (1.0 + torch.tanh(0.5 * input2))
-        # p = 0.5 * (1.0 + torch.erf(input2 / math.sqrt(2.0)))
+        if self.base_func == 'sigmoid':
+            p = torch.sigmoid(input2)
+        elif self.base_func == 'tanh':
+            p = 0.5 * (1.0 + torch.tanh(input2))
+        elif self.base_func == 'erf':
+            p = 0.5 * (1.0 + torch.erf(input2 / math.sqrt(2.0)))
+        else:
+            raise ValueError(f'ERROR: The {self.base_func} based bgu is undefined.')
         bern = torch.bernoulli(p)
         eps = torch.where(bern == 1, 1 - p, -p)
         gate = p + eps
@@ -65,6 +72,7 @@ class GatedFeedForward(nn.Module):
         value_imag = self.value_imag_linear(input_imag)
 
         if self.act_func == 'glu':
+            # value = torch.mul(value_real, torch.sigmoid(value_imag))
             # tanh(softplus(x)) is a sigmoid-like function.
             value = torch.mul(value_real, torch.tanh(self.softplus(value_imag)))
         elif self.act_func == 'gtu':
