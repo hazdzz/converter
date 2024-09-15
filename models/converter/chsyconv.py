@@ -45,6 +45,8 @@ class GenerateEigenvalue(nn.Module):
             eigenvalue = self.avgpool1d(input_linear).view(self.batch_size, self.length)
         else:
             eigenvalue = self.avgpool1d(input_linear.permute(0, 2 ,1)).view(self.batch_size, self.feat_dim)
+        
+        eigenvalue = torch.where(eigenvalue == 0, eigenvalue + 1e-8, eigenvalue)
 
         return eigenvalue
 

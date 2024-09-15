@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from model.converter import wrapper
+from models.converter import wrapper
 from utils import lra_dataloader, early_stopping, opt, los, metrices
 
 
