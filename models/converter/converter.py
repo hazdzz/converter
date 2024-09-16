@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .converter import chsyconv, embedding, ffn, norm
+from . import chsyconv, embedding, ffn, norm
 from torch import Tensor
 
 

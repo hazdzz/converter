@@ -46,7 +46,10 @@ class GenerateEigenvalue(nn.Module):
         else:
             eigenvalue = self.avgpool1d(input_linear.permute(0, 2 ,1)).view(self.batch_size, self.feat_dim)
         
-        eigenvalue = torch.where(eigenvalue == 0, eigenvalue + 1e-8, eigenvalue)
+        if eigenvalue.dtype == torch.float16:
+            eigenvalue = torch.where(eigenvalue == 0, eigenvalue + 1e-7, eigenvalue)
+        elif eigenvalue.dtype == torch.float32:
+            eigenvalue = torch.where(eigenvalue == 0, eigenvalue + 1e-10, eigenvalue)
 
         return eigenvalue
 

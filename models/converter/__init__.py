@@ -1,1 +1,1 @@
-__all__ = ['embedding', 'chsy_conv', 'bffn', 'norm', 'converter', 'wrapper']
+__all__ = ['embedding', 'chsyconv', 'ffn', 'norm', 'converter', 'wrapper']
