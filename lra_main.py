@@ -79,7 +79,7 @@ def prepare_model(args, device):
         model = wrapper.LRASingle(args).to(device)
 
     loss_cel = nn.CrossEntropyLoss()
-    loss_seq_kp = los.KernelPolynomialLoss(batch_size=args.batch_size, max_order=args.max_order, eta=args.eta)
+    loss_seq_kp = los.KernelPolynomialLoss(batch_size=args.batch_size, max_order=args.max_order)
 
     es = early_stopping.EarlyStopping(delta=0.0, 
                                       patience=args.patience,
@@ -236,7 +236,7 @@ def train(args, model, optimizer, scheduler, dataloader, loss_cel, loss_seq_kp, 
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = (1 - args.eta) * loss + args.eta * loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         loss.backward()
         optimizer.step()
 
@@ -270,7 +270,7 @@ def val(args, model, dataloader, loss_cel, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = (1 - args.eta) * loss + args.eta * loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
 
@@ -299,7 +299,7 @@ def test(args, model, dataloader, loss_cel, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
+            loss = (1 - args.eta) * loss + args.eta * loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
 
@@ -420,7 +420,7 @@ def train_retrieval(args, model, optimizer, scheduler, dataloader, loss_cel, los
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef) 
+            loss = (1 - args.eta) * loss + args.eta * loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
         loss.backward()
         optimizer.step()
 
@@ -455,7 +455,7 @@ def val_retrieval(args, model, dataloader, loss_cel, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef) 
+            loss = (1 - args.eta) * loss + args.eta * loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))
@@ -486,7 +486,7 @@ def test_retrieval(args, model, dataloader, loss_cel, loss_seq_kp, device):
         if (args.enable_kpm is True) and \
             (args.enable_kploss is True) and \
             (args.kernel_type == 'none' or args.kernel_type == 'dirichlet'):
-            loss = loss + loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef) 
+            loss = (1 - args.eta) * loss + args.eta * loss_seq_kp(model.converter.chsyconv.seq_kernel_poly.cheb_coef)
 
         acc_meter.update(acc.item(), targets.size(0))
         loss_meter.update(loss.item(), targets.size(0))

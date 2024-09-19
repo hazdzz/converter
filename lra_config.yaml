@@ -64,7 +64,7 @@ text:
   batch_size: 32
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.00001
+  eta: 0.01
   epochs: 60
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 5
@@ -100,7 +100,7 @@ image:
   batch_size: 64
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.1
+  eta: 0.01
   epochs: 30
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 3
