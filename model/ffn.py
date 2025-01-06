@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from utils import activation as act
 from torch import Tensor
 
 
@@ -44,14 +43,13 @@ class GatedFeedForward(nn.Module):
         self.linear1b = nn.Linear(feat_dim, hid_dim, bias=True)
         self.linear2 = nn.Linear(hid_dim, feat_dim, bias=True)
         self.softplus = nn.Softplus(beta=1.0, threshold=5.0)
-        # self.squareplus = act.Squareplus()
         self.gffn_dropout = nn.Dropout(p=gffn_drop_prob)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.xavier_uniform_(self.linear1a.weight, gain=1.0)
-        init.xavier_uniform_(self.linear1b.weight, gain=1.0)
+        init.xavier_uniform_(self.linear1a.weight, gain=math.sqrt(2.0))
+        init.xavier_uniform_(self.linear1b.weight, gain=3/5)
         init.xavier_uniform_(self.linear2.weight, gain=1.0)
         init.zeros_(self.linear1a.bias)
         init.zeros_(self.linear1b.bias)
@@ -65,7 +63,7 @@ class GatedFeedForward(nn.Module):
 
         linear1a = self.linear1a(input_real)
         linear1b = self.linear1b(input_imag)
-        linear =  self.softplus(linear1a) * torch.tanh(linear1b)
+        linear = self.softplus(linear1a) * torch.tanh(linear1b)
         linear = self.gffn_dropout(linear)
         ffn = self.linear2(linear)
 

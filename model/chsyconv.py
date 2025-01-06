@@ -61,7 +61,7 @@ class GenerateHyperparameters(nn.Module):
             nn.Linear(feat_dim, feat_dim, bias=True),
             Sine()
         )
-        self.pool1d = nn.AdaptiveAvgPool1d(6)
+        self.pool1d = nn.AdaptiveAvgPool1d(7)
 
         self.reset_parameters()
 
@@ -75,10 +75,10 @@ class GenerateHyperparameters(nn.Module):
     def forward(self, input: Tensor) -> Tensor:
         b, n, _ = input.size()
         parameters = self.siren(input)
-        parameters = self.pool1d(parameters).view(b, 6 * n)
-        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = parameters.chunk(6, dim=1)
+        parameters = self.pool1d(parameters).view(b, 7 * n)
+        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u, Theta = parameters.chunk(7, dim=1)
 
-        return Alpha_l[:,1:], Beta_l[:,1:], Gamma_l[:,1:], Alpha_u[:,:-1], Beta_u[:,:-1], Gamma_u[:,:-1]
+        return Alpha_l[:,1:], Beta_l[:,1:], Gamma_l[:,1:], Alpha_u[:,:-1], Beta_u[:,:-1], Gamma_u[:,:-1], Theta
 
 
 class GenerateDHHPParameters(nn.Module):
@@ -86,10 +86,14 @@ class GenerateDHHPParameters(nn.Module):
         super(GenerateDHHPParameters, self).__init__()
 
     def _compute_givens_rotation(self, alpha: Tensor, beta: Tensor, gamma: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
-        g_ii = torch.exp(-1j * (alpha + beta) * math.pi) * torch.cos(gamma * math.pi)
-        g_ij = torch.exp(-1j * (alpha - beta) * math.pi) * torch.sin(gamma * math.pi)
-        g_ji = -torch.exp(1j * (alpha - beta) * math.pi) * torch.sin(gamma * math.pi)
-        g_jj = torch.exp(1j * (alpha + beta) * math.pi) * torch.cos(gamma * math.pi)
+        rad_add = (alpha + beta) / 2 * math.pi
+        rad_sub = (alpha - beta) / 2 * math.pi
+        gamma = gamma / 2 * math.pi
+
+        g_ii = torch.complex(-torch.cos(rad_add), -torch.sin(rad_add)) * torch.cos(gamma)
+        g_ij = torch.complex(-torch.cos(rad_sub), -torch.sin(rad_sub)) * torch.sin(gamma)
+        g_ji = -torch.complex(torch.cos(rad_sub), torch.sin(rad_sub)) * torch.sin(gamma)
+        g_jj = torch.complex(torch.cos(rad_add), torch.sin(rad_add)) * torch.cos(gamma)
 
         return g_ii, g_ij, g_ji, g_jj
     
@@ -117,7 +121,7 @@ class DHHPTransform(nn.Module):
             else:
                 pass
         else:
-            input = torch.einsum('n,bnd->bnd', Diag, input)
+            input = torch.einsum('bn,bnd->bnd', Diag, input)
     
         # Compute Y
         # First row (j = 0)
@@ -144,7 +148,7 @@ class DHHPTransform(nn.Module):
         Z[:,N-1,:] = G_l_ji[:,N-2].unsqueeze(-1) * Y[:,N-2,:] + G_l_jj[:,N-2].unsqueeze(-1) * Y[:,N-1,:]
 
         if transform is True:
-            Z = torch.einsum('n,bnd->bnd', Diag, Z)
+            Z = torch.einsum('bn,bnd->bnd', Diag, Z)
         else:
             if N % 2 == 0:
                 # Permutation
@@ -283,7 +287,6 @@ class ChsyConv(nn.Module):
         self.hyperparameters = GenerateHyperparameters(length, feat_dim, eigenvector_drop_prob)
         self.givens_parameters_l = GenerateDHHPParameters()
         self.givens_parameters_u = GenerateDHHPParameters()
-        self.Theta = nn.Parameter(torch.empty(length))
         self.value_linear_real = nn.Linear(feat_dim, feat_dim, bias=True)
         self.value_linear_imag = nn.Linear(feat_dim, feat_dim, bias=True)
         self.value_dropout = nn.Dropout(p=value_drop_prob)
@@ -294,17 +297,16 @@ class ChsyConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.uniform_(self.Theta, a=-1.0, b=1.0)
         init.xavier_uniform_(self.value_linear_real.weight, gain=1.0)
         init.xavier_uniform_(self.value_linear_imag.weight, gain=1.0)
         init.zeros_(self.value_linear_real.bias)
         init.zeros_(self.value_linear_imag.bias)
 
     def forward(self, input: Tensor) -> Tensor:
-        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = self.hyperparameters(input)
+        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u, Theta = self.hyperparameters(input)
         G_l_ii, G_l_ij, G_l_ji, G_l_jj = self.givens_parameters_l(Alpha_l, Beta_l, Gamma_l)
         G_u_ii, G_u_ij, G_u_ji, G_u_jj = self.givens_parameters_u(Alpha_u, Beta_u, Gamma_u)
-        Theta = math.pi * self.Theta # [-\pi, \pi]
+        Theta = Theta * math.pi
         Diag = torch.complex(torch.cos(Theta), torch.sin(Theta))
 
         G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs = G_l_jj, -G_l_ij, -G_l_ji, G_l_ii
@@ -317,7 +319,7 @@ class ChsyConv(nn.Module):
         else:
             seq_cheb_eigenvalue = seq_eigenvalue
 
-        seq_cheb_eigenvalue = 2 * math.pi * self.q * seq_cheb_eigenvalue
+        seq_cheb_eigenvalue = 2.0 * math.pi * self.q * seq_cheb_eigenvalue
         seq_cheb_eigenvalue = torch.complex(torch.cos(seq_cheb_eigenvalue), torch.sin(seq_cheb_eigenvalue))
 
         value_real = self.value_linear_real(input)
