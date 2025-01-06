@@ -48,8 +48,8 @@ class GatedFeedForward(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.xavier_uniform_(self.linear1a.weight, gain=math.sqrt(2.0))
-        init.xavier_uniform_(self.linear1b.weight, gain=3/5)
+        init.xavier_uniform_(self.linear1a.weight, gain=1.0)
+        init.xavier_uniform_(self.linear1b.weight, gain=1.0)
         init.xavier_uniform_(self.linear2.weight, gain=1.0)
         init.zeros_(self.linear1a.bias)
         init.zeros_(self.linear1b.bias)
