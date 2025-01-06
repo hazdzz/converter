@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.nn.init as init
 from .norm import ScaleNorm
 from torch import Tensor
@@ -22,7 +23,7 @@ class SinusoidalPositionEmbedding(nn.Module):
 
     def forward(self, input: Tensor) -> Tensor:
         return self.pe[:, :input.size(1)].to(input.device)
-
+    
 
 class RecurrentPositionEmbedding(nn.Module):
     def __init__(self, embed_dim: int, num_layers: int = 2, drop_rate: float = 0.1) -> None:

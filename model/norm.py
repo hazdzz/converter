@@ -2,7 +2,7 @@ import numbers
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from typing import Union, List, Optional, Tuple
+from typing import Union, List
 from torch import Size, Tensor
 
 

@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from models.converter import wrapper
+from model import wrapper
 from utils import lra_dataloader, early_stopping, opt, los, metrices
 
 
@@ -28,7 +28,7 @@ def set_env(seed = 3407) -> None:
     # torch.backends.cudnn.enabled = False
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms(True)
+    # torch.use_deterministic_algorithms(True)
 
 
 def get_parameters():
@@ -59,7 +59,6 @@ def get_parameters():
     if args.enable_cuda and torch.cuda.is_available():
         # Set available CUDA devices
         # This option is crucial for multiple GPUs
-        # 'cuda' ≡ 'cuda:0'
         device = torch.device('cuda')
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
