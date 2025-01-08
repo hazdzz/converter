@@ -34,7 +34,7 @@ def set_env(seed = 3407) -> None:
 def get_parameters():
     parser = argparse.ArgumentParser(description='Converter for lra data')
     parser.add_argument('--config', type=str, default='lra_config.yaml', help='Path to the yaml configuration file')
-    parser.add_argument('--task', type=str, default='listops', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
+    parser.add_argument('--task', type=str, default='image', choices=['listops', 'image', 'pathfinder', 'text', 'retrieval'], help='Name of the task')
     args = parser.parse_args()
 
     with open(args.config, 'r') as file:

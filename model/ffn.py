@@ -38,9 +38,8 @@ class SignGatingUnit(nn.Module):
 class GatedFeedForward(nn.Module):
     def __init__(self, feat_dim: int, hid_dim: int, gffn_drop_prob: float = 0.1) -> None:
         super(GatedFeedForward, self).__init__()
-        
-        self.linear1a = nn.Linear(feat_dim, hid_dim, bias=True)
-        self.linear1b = nn.Linear(feat_dim, hid_dim, bias=True)
+        self.linear1_real = nn.Linear(feat_dim, hid_dim, bias=True)
+        self.linear1_imag = nn.Linear(feat_dim, hid_dim, bias=True)
         self.linear2 = nn.Linear(hid_dim, feat_dim, bias=True)
         self.softplus = nn.Softplus(beta=1.0, threshold=5.0)
         self.gffn_dropout = nn.Dropout(p=gffn_drop_prob)
@@ -48,11 +47,11 @@ class GatedFeedForward(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        init.xavier_uniform_(self.linear1a.weight, gain=1.0)
-        init.xavier_uniform_(self.linear1b.weight, gain=1.0)
+        init.xavier_uniform_(self.linear1_real.weight, gain=1.0)
+        init.xavier_uniform_(self.linear1_imag.weight, gain=1.0)
         init.xavier_uniform_(self.linear2.weight, gain=1.0)
-        init.zeros_(self.linear1a.bias)
-        init.zeros_(self.linear1b.bias)
+        init.zeros_(self.linear1_real.bias)
+        init.zeros_(self.linear1_imag.bias)
         init.zeros_(self.linear2.bias)
 
     def forward(self, input: Tensor) -> Tensor:
@@ -61,9 +60,9 @@ class GatedFeedForward(nn.Module):
         else:
             input_real, input_imag = input, input
 
-        linear1a = self.linear1a(input_real)
-        linear1b = self.linear1b(input_imag)
-        linear = self.softplus(linear1a) * torch.tanh(linear1b)
+        linear1_real = self.linear1_real(input_real)
+        linear1_imag = self.linear1_imag(input_imag)
+        linear = self.softplus(linear1_real) * torch.tanh(linear1_imag)
         linear = self.gffn_dropout(linear)
         ffn = self.linear2(linear)
 
