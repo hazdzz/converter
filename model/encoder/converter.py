@@ -1,23 +1,42 @@
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.nn.init as init
-from . import norm
 from torch import Tensor
-from typing import Optional
+from typing import Optional, Union
+from .. import embedding, norm
 
 
-class Sine(nn.Module):
-    def __init__(self) -> None:
-        super(Sine, self).__init__()
+def complex_fcaller(funtional_handle, *args):
+    return torch.complex(funtional_handle(args[0].real, *args[1:]), funtional_handle(args[0].imag, *args[1:]))
 
+
+class _ComplexDropoutNd(nn.Module):
+    __constants__ = ['p', 'inplace']
+    p: float
+    inplace: bool
+
+    def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
+        super(_ComplexDropoutNd, self).__init__()
+        if p < 0 or p > 1:
+            raise ValueError("dropout probability has to be between 0 and 1, \
+                             but got {}".format(p))
+        self.p = p
+        self.inplace = inplace
+
+    def extra_repr(self) -> str:
+        return 'p={}, inplace={}'.format(self.p, self.inplace)
+
+
+class ComplexDropout(_ComplexDropoutNd):
     def forward(self, input: Tensor) -> Tensor:
-        return torch.sin(input)
+        return complex_fcaller(F.dropout, input, self.p, self.training, self.inplace)
     
 
-class ComplexDropout(nn.Module):
+class SeparateComplexDropout(nn.Module):
     def __init__(self, p: float = 0.5) -> None:
-        super(ComplexDropout, self).__init__()
+        super(SeparateComplexDropout, self).__init__()
         self.dropout = nn.Dropout(p)
 
     def forward(self, input1: Tensor, input2: Optional[Tensor] = None) -> Tensor:
@@ -34,11 +53,17 @@ class ComplexDropout(nn.Module):
         return output
 
 
+class Sine(nn.Module):
+    def __init__(self) -> None:
+        super(Sine, self).__init__()
+
+    def forward(self, input: Tensor) -> Tensor:
+        return torch.sin(input)
+
+
 class GenerateEigenvalue(nn.Module):
-    def __init__(self, batch_size, length, feat_dim, pool_dim, drop_prob) -> None:
+    def __init__(self, feat_dim: int, pool_dim: int, drop_prob: float = 0.1) -> None:
         super(GenerateEigenvalue, self).__init__()
-        self.batch_size = batch_size
-        self.length = length
         self.feat_dim = feat_dim
         self.pool_dim = pool_dim
         self.siren = nn.Sequential(
@@ -66,10 +91,9 @@ class GenerateEigenvalue(nn.Module):
         return eigenvalue
     
 
-class GenerateHyperparameters(nn.Module):
-    def __init__(self, length, feat_dim, drop_prob) -> None:
-        super(GenerateHyperparameters, self).__init__()
-        self.length = length
+class GenerateParameters(nn.Module):
+    def __init__(self, length: int, feat_dim: int, drop_prob: float = 0.1) -> None:
+        super(GenerateParameters, self).__init__()
         self.feat_dim = feat_dim
         self.siren = nn.Sequential(
             nn.Linear(feat_dim, feat_dim, bias=True),
@@ -77,9 +101,10 @@ class GenerateHyperparameters(nn.Module):
             norm.ScaleNorm(feat_dim),
             nn.Dropout(p=drop_prob),
             nn.Linear(feat_dim, feat_dim, bias=True), 
-            Sine()
+            Sine(),
+            norm.FixNorm(feat_dim)
         )
-        self.pool1d = nn.AdaptiveAvgPool1d(6)
+        self.pool = nn.AdaptiveAvgPool1d(6)
 
         self.reset_parameters()
 
@@ -92,17 +117,16 @@ class GenerateHyperparameters(nn.Module):
     
     def forward(self, input: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         b, n, _ = input.size()
-        parameters = self.siren(input)    
-        pooled = self.pool1d(parameters).view(b, 6 * n)
-        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = pooled.chunk(6, dim=1)
-
-        return Alpha_l[:,1:], Beta_l[:,1:], Gamma_l[:,1:], Alpha_u[:,:-1], Beta_u[:,:-1], Gamma_u[:,:-1]
+        parameters = self.siren(input)
+        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = self.pool(parameters).view(b, 6 * n).chunk(6, dim=1)
+        
+        return Alpha_l[:,0:-1], Beta_l[:,0:-1], Gamma_l[:,0:-1], Alpha_u[:,1:n], Beta_u[:,1:n], Gamma_u[:,1:n]
     
 
 def gengerate_dhhp_parameters(alpha: Tensor, beta: Tensor, gamma: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
-    rad_add = (alpha + beta) / 2 * math.pi
-    rad_sub = (alpha - beta) / 2 * math.pi
-    gamma = gamma / 2 * math.pi
+    rad_add = (alpha + beta) * math.pi
+    rad_sub = (alpha - beta) * math.pi
+    gamma = gamma * math.pi
 
     g_ii = torch.exp(-1j * rad_add) * torch.cos(gamma)
     g_ij = torch.exp(-1j * rad_sub) * torch.sin(gamma)
@@ -118,8 +142,9 @@ def gengerate_dhhp_parameters(alpha: Tensor, beta: Tensor, gamma: Tensor) -> tup
 
 
 class DHHPTransform(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, permutation_dim: Optional[int] = None) -> None:
         super(DHHPTransform, self).__init__()
+        self.M = permutation_dim
 
     def forward(self, transform: bool, input: Tensor, G_l_ii: Tensor, G_l_ij: Tensor, G_l_ji: Tensor, G_l_jj: Tensor, \
                 G_u_ii: Tensor, G_u_ij: Tensor, G_u_ji: Tensor, G_u_jj: Tensor, Diag: Optional[Tensor] = None) -> Tensor:
@@ -127,7 +152,9 @@ class DHHPTransform(nn.Module):
         Y = torch.zeros_like(input)
         Z = torch.zeros_like(input)
 
-        if (transform is False) and (Diag is not None):
+        if (transform is True) and (self.M is not None):
+            input = input.reshape(B, N // self.M, self.M, D).transpose(1, 2).reshape(B, N, D)
+        elif (transform is False) and (Diag is not None):
             input = torch.einsum('bn,bnd->bnd', Diag, input)
     
         # Compute Y
@@ -156,14 +183,16 @@ class DHHPTransform(nn.Module):
 
         if (transform is True) and (Diag is not None):
             Z = torch.einsum('bn,bnd->bnd', Diag, Z)
+        elif (transform is False) and (self.M is not None):
+            Z = Z.reshape(B, self.M, N // self.M, D).transpose(1, 2).reshape(B, N, D)
 
         return Z
     
 
 class InverseDHHPTransform(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, permutation_dim: Optional[int] = None) -> None:
         super(InverseDHHPTransform, self).__init__()
-        self.inverse_dhhp_transform = DHHPTransform()
+        self.inverse_dhhp_transform = DHHPTransform(permutation_dim)
 
     def forward(self, transform: bool, input: Tensor, G_l_ii_conj_trs: Tensor, G_l_ij_conj_trs: Tensor, G_l_ji_conj_trs: Tensor, G_l_jj_conj_trs: Tensor, \
                 G_u_ii_conj_trs: Tensor, G_u_ij_conj_trs: Tensor, G_u_ji_conj_trs: Tensor, G_u_jj_conj_trs: Tensor, Diag_conj_trs: Optional[Tensor] = None):
@@ -172,7 +201,7 @@ class InverseDHHPTransform(nn.Module):
 
 
 class KernelPolynomial(nn.Module):
-    def __init__(self, batch_size, kernel_type: str = 'none', max_order: int = 2, 
+    def __init__(self, batch_size: int, kernel_type: str = 'none', max_order: int = 2, 
                  mu: int = 3, xi: float = 4.0, 
                  stigma: float = 0.5, heta: int = 2) -> None:
         super(KernelPolynomial, self).__init__()
@@ -260,7 +289,7 @@ class KernelPolynomial(nn.Module):
 
         if self.max_order >= 2:
             for k in range(2, self.max_order + 1):
-                # Tx_2 = 2x * Tx_1 - Tx_0 
+                # Tx_2 = 2 * x * Tx_1 - Tx_0 
                 Tx_2 = 2.0 * seq * Tx_1 - Tx_0
                 ChebGibbs = ChebGibbs + Tx_2 * self.cheb_coef[:, k].unsqueeze(1) * gibbs_damp[:, k].unsqueeze(1)
                 Tx_0, Tx_1 = Tx_1, Tx_2
@@ -268,29 +297,33 @@ class KernelPolynomial(nn.Module):
         return ChebGibbs
     
 
-class ChsyConv(nn.Module):
+class Kernelution(nn.Module):
     def __init__(self, batch_size: int, length: int, feat_dim: int, 
-                 eigenvalue_drop_prob: float, eigenvector_drop_prob: float, value_drop_prob: float, 
-                 enable_kpm: bool, q: float = 0.5, kernel_type: str = 'none', 
+                 eigenvalue_drop_prob: float = 0.1, eigenvector_drop_prob: float = 0.1, value_drop_prob: float = 0.1, 
+                 permutation_dim: Union[int, str, None] = None, 
+                 enable_kpm: bool = True, kernel_type: str = 'none', 
                  max_order: int = 2, mu: int = 3, xi: float = 4.0, 
                  stigma: float = 0.5, heta: int = 2) -> None:
-        super(ChsyConv, self).__init__()
-
+        super(Kernelution, self).__init__()
         self.batch_size = batch_size
         self.length = length
         self.feat_dim = feat_dim
-        self.q = q # [0, 0.5]
         self.enable_kpm = enable_kpm
         seq_pool_dim = 2
-        self.seq_eigenvalue = GenerateEigenvalue(batch_size, length, feat_dim, seq_pool_dim, eigenvalue_drop_prob)
+        self.seq_eigenvalue = GenerateEigenvalue(feat_dim, seq_pool_dim, eigenvalue_drop_prob)
         self.seq_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
-        self.hyperparameters = GenerateHyperparameters(length, feat_dim, eigenvector_drop_prob)
+        self.givens_parameters = GenerateParameters(length, feat_dim, eigenvector_drop_prob)
         self.Theta = nn.Parameter(torch.empty(batch_size, length))
         self.value_linear_real = nn.Linear(feat_dim, feat_dim, bias=False)
         self.value_linear_imag = nn.Linear(feat_dim, feat_dim, bias=False)
-        self.value_dropout = ComplexDropout(p=value_drop_prob)
-        self.dhhp_transform = DHHPTransform()
-        self.inverse_dhhp_transform = InverseDHHPTransform()
+        # self.value_dropout = ComplexDropout(p=value_drop_prob)
+        self.value_dropout = SeparateComplexDropout(p=value_drop_prob)
+        if (permutation_dim is None) or (permutation_dim == 'none') or (permutation_dim == 0):
+            self.dhhp_transform = DHHPTransform()
+            self.inverse_dhhp_transform = InverseDHHPTransform()
+        else:
+            self.dhhp_transform = DHHPTransform(permutation_dim)
+            self.inverse_dhhp_transform = InverseDHHPTransform(permutation_dim)
 
         self.reset_parameters()
 
@@ -300,29 +333,108 @@ class ChsyConv(nn.Module):
         init.uniform_(self.Theta, a=0.0, b=2.0)
 
     def forward(self, input: Tensor) -> Tensor:
-        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = self.hyperparameters(input)
-
+        # Hyperparameters for 1-DHHP
+        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = self.givens_parameters(input)
         G_l_ii, G_l_ij, G_l_ji, G_l_jj, G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs = gengerate_dhhp_parameters(Alpha_l, Beta_l, Gamma_l)
         G_u_ii, G_u_ij, G_u_ji, G_u_jj, G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs = gengerate_dhhp_parameters(Alpha_u, Beta_u, Gamma_u)
-
         Diag = torch.exp(1j * math.pi * self.Theta)
         Diag_conj_trs = Diag.conj()
 
+        # Eigenvalues
         seq_eigenvalue = self.seq_eigenvalue(input)
-        if self.enable_kpm:
+        if self.enable_kpm is True:
             seq_cheb_eigenvalue = self.seq_kernel_poly(seq_eigenvalue)
         else:
             seq_cheb_eigenvalue = seq_eigenvalue
+        digraph_conv_eigenvalue = torch.exp(1j * seq_cheb_eigenvalue)
 
-        digraph_conv_eigenvalue = torch.exp(2j * math.pi * self.q * seq_cheb_eigenvalue)
-
+        # Value
         value_real = self.value_linear_real(input)
         value_imag = self.value_linear_imag(input)
-        value = self.value_dropout(value_real, value_imag)
+        value = torch.complex(value_real, value_imag)
+        value = self.value_dropout(value)
 
+        # Kernerlution
         unitary_conv_1d_forward = self.dhhp_transform(True, value, G_l_ii, G_l_ij, G_l_ji, G_l_jj, G_u_ii, G_u_ij, G_u_ji, G_u_jj, Diag)
         unitary_conv_1d = torch.einsum('bn,bnd->bnd', digraph_conv_eigenvalue, unitary_conv_1d_forward)
         unitary_conv_1d_inverse = self.inverse_dhhp_transform(False, unitary_conv_1d, G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs, \
                                                             G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs, Diag_conj_trs)
         
         return unitary_conv_1d_inverse
+    
+
+class GatedFeedForward(nn.Module):
+    def __init__(self, feat_dim: int, hid_dim: int, gffn_drop_prob: float = 0.1) -> None:
+        super(GatedFeedForward, self).__init__()
+        self.linear1_real = nn.Linear(feat_dim, hid_dim, bias=True)
+        self.linear1_imag = nn.Linear(feat_dim, hid_dim, bias=True)
+        self.linear2 = nn.Linear(hid_dim, feat_dim, bias=True)
+        self.softplus = nn.Softplus(beta=1.0, threshold=5.0)
+        self.gffn_dropout = nn.Dropout(p=gffn_drop_prob)
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        init.xavier_uniform_(self.linear1_real.weight, gain=1.0)
+        init.xavier_uniform_(self.linear1_imag.weight, gain=1.0)
+        init.xavier_uniform_(self.linear2.weight, gain=1.0)
+        init.zeros_(self.linear1_real.bias)
+        init.zeros_(self.linear1_imag.bias)
+        init.zeros_(self.linear2.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        if input.is_complex():
+            input_real, input_imag = input.real, input.imag
+        else:
+            input_real, input_imag = input, input
+
+        linear1_real = self.linear1_real(input_real)
+        linear1_imag = self.linear1_imag(input_imag)
+        linear = self.softplus(linear1_real) * torch.tanh(linear1_imag)
+        linear = self.gffn_dropout(linear)
+        ffn = self.linear2(linear)
+
+        return ffn
+
+
+class ConverterEncoder(nn.Module):
+    def __init__(self, args) -> None:
+        super(ConverterEncoder, self).__init__()
+        self.embedding = embedding.Embedding(args.pe_type, 
+                                             args.pooling_type, 
+                                             args.vocab_size, 
+                                             args.max_seq_len, 
+                                             args.embed_dim, 
+                                             args.pe_drop_prob, 
+                                             args.embed_drop_prob)
+        self.kernelution = Kernelution(args.batch_size, 
+                                       args.max_seq_len, 
+                                       args.embed_dim, 
+                                       args.xformer.converter.eigenvalue_drop_prob, 
+                                       args.xformer.converter.eigenvector_drop_prob, 
+                                       args.value_drop_prob, 
+                                       args.xformer.converter.permutation_dim, 
+                                       args.xformer.converter.enable_kpm, 
+                                       args.xformer.converter.kernel_type, 
+                                       args.xformer.converter.max_order, 
+                                       args.xformer.converter.mu, 
+                                       args.xformer.converter.xi, 
+                                       args.xformer.converter.stigma, 
+                                       args.xformer.converter.heta)
+        self.gffn = GatedFeedForward(args.embed_dim, args.hidden_dim, args.ffn_drop_prob)
+        self.kernelution_norm = norm.ScaleNorm(args.embed_dim)
+        self.gffn_norm = norm.ScaleNorm(args.embed_dim)
+        self.alpha = nn.Parameter(torch.ones(1))
+
+    def forward(self, input: Tensor) -> Tensor:
+        alpha = torch.clamp(self.alpha, min=0.0, max=1.0).to(input.device)
+        
+        embed = self.embedding(input)
+
+        kernelution = self.kernelution(embed) + embed
+        kernelution_normed = self.kernelution_norm(kernelution)
+
+        gffn = self.gffn(kernelution_normed) + alpha * kernelution_normed.real + (1.0 - alpha) * kernelution_normed.imag
+        converter_encoder = self.gffn_norm(gffn)
+
+        return converter_encoder

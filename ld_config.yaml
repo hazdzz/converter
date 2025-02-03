@@ -1,0 +1,86 @@
+longdoc16k:
+  dataset: "longdoc16k"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 16384
+  vocab_size: 4289  # 4288 unique symbols + 1 PAD + 1 CLS
+  embed_dim: 128
+  hidden_dim: 512
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  encoder_dim: 128
+  mlp_dim: 128
+  num_head: 2
+  num_block: 2
+  num_class: 4
+  interaction: "None"
+  enable_cuda: true
+  device_id: 1
+  pe_drop_prob: 0.1
+  embed_drop_prob: 0.1
+  value_drop_prob: 0.1
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 4
+  lr: 0.001
+  weight_decay: 0.001
+  epochs: 50
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
+  patience: 5
+  num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.1
+
+
+longdoc32k:
+  dataset: "longdoc32k"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 32768
+  vocab_size: 4289  # 4288 unique symbols + 1 PAD + 1 CLS
+  embed_dim: 128
+  hidden_dim: 512
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  encoder_dim: 128
+  mlp_dim: 128
+  num_head: 2
+  num_block: 2
+  num_class: 4
+  interaction: "None"
+  enable_cuda: true
+  device_id: 0
+  pe_drop_prob: 0.1
+  embed_drop_prob: 0.1
+  value_drop_prob: 0.1
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 4
+  lr: 0.001
+  weight_decay: 0.001
+  epochs: 50
+  optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
+  patience: 5
+  num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.1

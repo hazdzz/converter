@@ -1,20 +1,11 @@
 listops:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
-  vocab_size: 17 # 15 tokens + 1 PAD + 1 CLS
-  embed_dim: 32
-  max_seq_len: 2000
-  enable_kpm: true
-  enable_kploss: false
-  q: 0.5
-  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
-  max_order: 2
-  mu: 3
-  xi: 4.0
-  stigma: 0.5
-  heta: 2
-  hid_dim: 128
   dataset: "listops"
-  pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 1999
+  vocab_size: 16 # 15 tokens + 1 PAD
+  embed_dim: 32
+  hidden_dim: 128
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 32
   mlp_dim: 32
   num_class: 10
@@ -23,36 +14,40 @@ listops:
   device_id: 0
   pe_drop_prob: 0.1
   embed_drop_prob: 0.1
-  eigenvalue_drop_prob: 0.0
-  eigenvector_drop_prob: 0.0
   value_drop_prob: 0.1
-  gffn_drop_prob: 0.1
-  batch_size: 64
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 128
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.00001
   epochs: 100
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 7
   num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.001
+
 
 text:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
-  vocab_size: 97 # 95 unique symbols + 1 PAD + 1 CLS
-  embed_dim: 64
-  max_seq_len: 4097
-  enable_kpm: true
-  enable_kploss: true
-  q: 0.5
-  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
-  max_order: 2
-  mu: 3
-  xi: 4.0
-  stigma: 0.5
-  heta: 2
-  hid_dim: 256
   dataset: "text"
-  pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 4096
+  vocab_size: 96 # 95 unique symbols + 1 PAD
+  embed_dim: 64
+  hidden_dim: 256
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
   mlp_dim: 64
   num_class: 2
@@ -61,36 +56,40 @@ text:
   device_id: 0
   pe_drop_prob: 0.1
   embed_drop_prob: 0.1
-  eigenvalue_drop_prob: 0.0
-  eigenvector_drop_prob: 0.0
   value_drop_prob: 0.1
-  gffn_drop_prob: 0.1
-  batch_size: 32
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 128
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.00001
   epochs: 60
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 5
   num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.001
+
 
 image:
+  dataset: "image"
   pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 1024
   vocab_size: 256 # 256 unique pixel values
   embed_dim: 64
-  max_seq_len: 1024
-  enable_kpm: true
-  enable_kploss: true
-  q: 0.5
-  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
-  max_order: 2
-  mu: 3
-  xi: 4.0
-  stigma: 0.5
-  heta: 2
-  hid_dim: 256
-  dataset: "image"
-  pooling_type: "FLATTEN" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  hidden_dim: 256
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
   mlp_dim: 64
   num_class: 10
@@ -99,36 +98,40 @@ image:
   device_id: 0 # single GPU
   pe_drop_prob: 0.1
   embed_drop_prob: 0.1
-  eigenvalue_drop_prob: 0.1
-  eigenvector_drop_prob: 0.1
   value_drop_prob: 0.1
-  gffn_drop_prob: 0.1
-  batch_size: 64
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 128
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.001
   epochs: 30
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
   patience: 3
   num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.01
+
 
 pathfinder:
+  dataset: "pathfinder"
   pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 1024
   vocab_size: 225 # 225 unique pixel values
   embed_dim: 64
-  max_seq_len: 1024
-  enable_kpm: true
-  enable_kploss: true
-  q: 0.5
-  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
-  max_order: 2
-  mu: 3
-  xi: 4.0
-  stigma: 0.5
-  heta: 2
-  hid_dim: 256
-  dataset: "pathfinder"
-  pooling_type: "FLATTEN" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  hidden_dim: 256
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
   mlp_dim: 64
   num_class: 2
@@ -137,36 +140,40 @@ pathfinder:
   device_id: 0
   pe_drop_prob: 0.1
   embed_drop_prob: 0.1
-  eigenvalue_drop_prob: 0.0
-  eigenvector_drop_prob: 0.0
   value_drop_prob: 0.1
-  gffn_drop_prob: 0.1
-  batch_size: 128
-  lr: 0.001
-  weight_decay: 0.001
-  eta: 0.0001
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 256
+  lr: 0.0002
+  weight_decay: 0.0002
   epochs: 60
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
-  patience: 2
+  patience: 3
   num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.001
+
 
 retrieval:
-  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
-  vocab_size: 98 # 96 unique symbols + 1 PAD + 1 CLS
-  embed_dim: 64
-  max_seq_len: 4001
-  enable_kpm: true
-  enable_kploss: true
-  q: 0.5
-  kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
-  max_order: 2
-  mu: 3
-  xi: 4.0
-  stigma: 0.5
-  heta: 2
-  hid_dim: 256
   dataset: "retrieval"
-  pooling_type: "CLS" # "CLS", "MEAN", "SUM", or "FLATTEN"
+  pe_type: "rpe" # "nope", "spe", "ape", or "rpe"
+  max_seq_len: 4000
+  vocab_size: 98 # 96 unique symbols + 1 PAD
+  embed_dim: 64
+  hidden_dim: 256
+  pooling_type: "MEAN" # "CLS", "MEAN", "SUM", or "FLATTEN"
   encoder_dim: 64
   mlp_dim: 64
   num_class: 2
@@ -175,15 +182,27 @@ retrieval:
   device_id: 0
   pe_drop_prob: 0.1
   embed_drop_prob: 0.1
-  eigenvalue_drop_prob: 0.0
-  eigenvector_drop_prob: 0.0
   value_drop_prob: 0.1
-  gffn_drop_prob: 0.1
-  batch_size: 128
+  ffn_drop_prob: 0.1
+  decoder_drop_prob: 0.0
+  batch_size: 256
   lr: 0.001
   weight_decay: 0.001
-  eta: 0.00001
   epochs: 30
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
-  patience: 2
+  patience: 3
   num_workers: 2
+  xformer:
+    converter:
+      permutation_dim: 0
+      enable_kpm: true
+      enable_kploss: true
+      kernel_type: "none" # "none", "dirichlet", "fejer", "jackson", "lanczos", "lorentz", "vekic", or "wang"
+      max_order: 2
+      mu: 3
+      xi: 4.0
+      stigma: 0.5
+      heta: 2
+      eigenvalue_drop_prob: 0.1
+      eigenvector_drop_prob: 0.1
+      eta: 0.001

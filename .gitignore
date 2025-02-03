@@ -6,8 +6,13 @@
 
 # Data
 data/*
-*.zip
+dataset/*
+datasets/*
+*.7z
+*.gz
+*.rar
 *.tar
+*.zip
 
 # PyTorch models
 *.pt

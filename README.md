@@ -5,11 +5,11 @@ The official PyTorch implementation of Converter proposed by our paper *Converte
 
 ## Citation
 ```
-@article{zhang2024converter,
+@article{zhang2025converter,
     author  = {Zhang, Jie and Wang, Kuan-Chieh and Chiu, Bo-Wei and Sun, Min-Te},
-    title   = {Converter: Converting Transformers into DGNNs},
+    title   = {Converter: Converting Transformers into DGNNs Form},
     journal = {arXiv preprint},
-    year    = {2024}
+    year    = {2025}
 }
 ```
 
