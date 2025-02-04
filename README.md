@@ -17,8 +17,4 @@ The official PyTorch implementation of Converter proposed by our paper *Converte
 To install requirements:
 ```console
 pip3 install -r requirements.txt
-
-> [!Attention]
-> In order to reproduce the experimental results, we strongly recommand you to adopt the following environment:
-> python ~= 3.10.14
-> cuda ~= 12.1
+```
