@@ -1,7 +1,7 @@
 # Converter
 
 ## About
-The official PyTorch implementation of Converter proposed by our paper *Converter: Converting Transformers into DGNNs*.
+The official PyTorch implementation of Converter proposed by our paper *Converting Transformers into DGNNs*.
 
 ## Citation
 ```
