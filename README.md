@@ -7,7 +7,7 @@ The official PyTorch implementation of Converter proposed by our paper *Converte
 ```
 @article{zhang2025converter,
     author  = {Zhang, Jie and Wang, Kuan-Chieh and Chiu, Bo-Wei and Sun, Min-Te},
-    title   = {Converter: Converting Transformers into DGNNs Form},
+    title   = {Converting Transformers into DGNNs Form},
     journal = {arXiv preprint arXiv: 2502.00585},
     year    = {2025}
 }
