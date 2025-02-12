@@ -277,7 +277,7 @@ class KernelPolynomial(nn.Module):
 
         # Tx_0 = 1
         Tx_0 = torch.ones_like(seq)
-        ChebGibbs = self.cheb_coef[:, 0].unsqueeze(1)
+        ChebGibbs = Tx_0 * self.cheb_coef[:, 0].unsqueeze(1)
         if self.max_order == 0:
             return ChebGibbs
 
