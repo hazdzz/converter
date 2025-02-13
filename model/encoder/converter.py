@@ -162,9 +162,9 @@ class DHHPTransform(nn.Module):
         Y[:,0,:] = G_u_ii[:,0].unsqueeze(-1) * input[:,0,:] + G_u_ij[:,0].unsqueeze(-1) * input[:,1,:]
     
         # Middle rows (j in [1, N-2])
-        Y[:,1:N-1,:] = (G_u_ji[:,:-1].unsqueeze(-1) * input[:,:-2,:] + \
+        Y[:,1:N-1,:] = (G_u_ji[:,:-1].unsqueeze(-1) * input[:,0:N-2,:] + \
                         (G_u_jj[:,:-1] * G_u_ii[:,1:]).unsqueeze(-1) * input[:,1:N-1,:] + \
-                        (G_u_jj[:,:-1] * G_u_ij[:,1:]).unsqueeze(-1) * input[:,2:,:])
+                        (G_u_jj[:,:-1] * G_u_ij[:,1:]).unsqueeze(-1) * input[:,2:N,:])
     
         # Last row (j = N-1)
         Y[:,N-1,:] = G_u_ji[:,N-2].unsqueeze(-1) * input[:,N-2,:] + G_u_jj[:,N-2].unsqueeze(-1) * input[:,N-1,:]
@@ -174,9 +174,9 @@ class DHHPTransform(nn.Module):
         Z[:,0,:] = G_l_ii[:,0].unsqueeze(-1) * Y[:,0,:] + G_l_ij[:,0].unsqueeze(-1) * Y[:,1,:]
     
         # Middle rows (i in [1, N-2])
-        Z[:,1:N-1,:] = ((G_l_ii[:,1:] * G_l_ji[:,:-1]).unsqueeze(-1) * Y[:,:-2,:] + \
+        Z[:,1:N-1,:] = ((G_l_ii[:,1:] * G_l_ji[:,:-1]).unsqueeze(-1) * Y[:,0:N-2,:] + \
                         (G_l_ii[:,1:] * G_l_jj[:,:-1]).unsqueeze(-1) * Y[:,1:N-1,:] + \
-                        G_l_ij[:,1:].unsqueeze(-1) * Y[:,2:,:])
+                        G_l_ij[:,1:].unsqueeze(-1) * Y[:,2:N,:])
     
         # Last row (i = N-1)
         Z[:,N-1,:] = G_l_ji[:,N-2].unsqueeze(-1) * Y[:,N-2,:] + G_l_jj[:,N-2].unsqueeze(-1) * Y[:,N-1,:]
