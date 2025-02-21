@@ -45,7 +45,7 @@ def dict_to_namespace(d):
 def get_parameters():
     parser = argparse.ArgumentParser(description='Converter for long-range arena benchmark')
     parser.add_argument('--config', type=Path, default="lra_config.yaml", help='Path to the yaml configuration file')
-    parser.add_argument('--dataset', type=str, default="retrieval", choices=['image', 'listops', 'text', 'pathfinder','retrieval'], help='Name of the task')
+    parser.add_argument('--dataset', type=str, default="image", choices=['image', 'listops', 'text', 'pathfinder','retrieval'], help='Name of the task')
     parser.add_argument('--xformer', type=str, default='converter', help='Type of transformer to use')
     namespace = parser.parse_args()
     

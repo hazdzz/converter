@@ -92,7 +92,7 @@ class GenerateEigenvalue(nn.Module):
     
 
 class GenerateParameters(nn.Module):
-    def __init__(self, length: int, feat_dim: int, drop_prob: float = 0.1) -> None:
+    def __init__(self, feat_dim: int, drop_prob: float = 0.1) -> None:
         super(GenerateParameters, self).__init__()
         self.feat_dim = feat_dim
         self.siren = nn.Sequential(
@@ -104,7 +104,7 @@ class GenerateParameters(nn.Module):
             Sine(),
             norm.FixNorm(feat_dim)
         )
-        self.pool = nn.AdaptiveAvgPool1d(6)
+        self.pool = nn.AdaptiveAvgPool1d(7)
 
         self.reset_parameters()
 
@@ -118,20 +118,20 @@ class GenerateParameters(nn.Module):
     def forward(self, input: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         b, n, _ = input.size()
         parameters = self.siren(input)
-        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = self.pool(parameters).view(b, 6 * n).chunk(6, dim=1)
+        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u, Theta = self.pool(parameters).view(b, 7 * n).chunk(7, dim=1)
         
-        return Alpha_l[:,0:-1], Beta_l[:,0:-1], Gamma_l[:,0:-1], Alpha_u[:,1:n], Beta_u[:,1:n], Gamma_u[:,1:n]
+        return Alpha_l[:,0:-1], Beta_l[:,0:-1], Gamma_l[:,0:-1], Alpha_u[:,1:n], Beta_u[:,1:n], Gamma_u[:,1:n], Theta
     
 
 def gengerate_dhhp_parameters(alpha: Tensor, beta: Tensor, gamma: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
-    rad_add = (alpha + beta) * math.pi
-    rad_sub = (alpha - beta) * math.pi
-    gamma = gamma * math.pi
+    A = (alpha + beta) * math.pi
+    B = (alpha - beta) * math.pi
+    C = gamma * math.pi
 
-    g_ii = torch.exp(-1j * rad_add) * torch.cos(gamma)
-    g_ij = torch.exp(-1j * rad_sub) * torch.sin(gamma)
-    g_ji = -torch.exp(1j * rad_sub) * torch.sin(gamma)
-    g_jj = torch.exp(1j * rad_add) * torch.cos(gamma)
+    g_ii = torch.exp(-1j * A) * torch.cos(C)
+    g_ij = -torch.exp(1j * B) * torch.sin(C)
+    g_ji = torch.exp(-1j * B) * torch.sin(C)
+    g_jj = torch.exp(1j * A) * torch.cos(C)
 
     g_ii_conj_trs = g_jj
     g_ij_conj_trs = -g_ij
@@ -142,62 +142,55 @@ def gengerate_dhhp_parameters(alpha: Tensor, beta: Tensor, gamma: Tensor) -> tup
 
 
 class DHHPTransform(nn.Module):
-    def __init__(self, permutation_dim: Optional[int] = None) -> None:
+    def __init__(self, transform: bool = True, permutation_dim: Optional[int] = None) -> None:
         super(DHHPTransform, self).__init__()
+        self.transform = transform
         self.M = permutation_dim
 
-    def forward(self, transform: bool, input: Tensor, G_l_ii: Tensor, G_l_ij: Tensor, G_l_ji: Tensor, G_l_jj: Tensor, \
+    def forward(self, X: Tensor, G_l_ii: Tensor, G_l_ij: Tensor, G_l_ji: Tensor, G_l_jj: Tensor, \
                 G_u_ii: Tensor, G_u_ij: Tensor, G_u_ji: Tensor, G_u_jj: Tensor, Diag: Optional[Tensor] = None) -> Tensor:
-        B, N, D = input.size()
-        Y = torch.zeros_like(input)
-        Z = torch.zeros_like(input)
+        B, N, D = X.size()
+        Y = torch.zeros_like(X)
+        Z = torch.zeros_like(X)
 
-        if (transform is True) and (self.M is not None):
-            input = input.reshape(B, N // self.M, self.M, D).transpose(1, 2).reshape(B, N, D)
-        elif (transform is False) and (Diag is not None):
-            input = torch.einsum('bn,bnd->bnd', Diag, input)
-    
-        # Compute Y
-        # First row (j = 0)
-        Y[:,0,:] = G_u_ii[:,0].unsqueeze(-1) * input[:,0,:] + G_u_ij[:,0].unsqueeze(-1) * input[:,1,:]
-    
-        # Middle rows (j in [1, N-2])
-        Y[:,1:N-1,:] = (G_u_ji[:,:-1].unsqueeze(-1) * input[:,0:N-2,:] + \
-                        (G_u_jj[:,:-1] * G_u_ii[:,1:]).unsqueeze(-1) * input[:,1:N-1,:] + \
-                        (G_u_jj[:,:-1] * G_u_ij[:,1:]).unsqueeze(-1) * input[:,2:N,:])
-    
-        # Last row (j = N-1)
-        Y[:,N-1,:] = G_u_ji[:,N-2].unsqueeze(-1) * input[:,N-2,:] + G_u_jj[:,N-2].unsqueeze(-1) * input[:,N-1,:]
-    
-        # Compute Z
-        # First row (i = 0)
-        Z[:,0,:] = G_l_ii[:,0].unsqueeze(-1) * Y[:,0,:] + G_l_ij[:,0].unsqueeze(-1) * Y[:,1,:]
-    
-        # Middle rows (i in [1, N-2])
-        Z[:,1:N-1,:] = ((G_l_ii[:,1:] * G_l_ji[:,:-1]).unsqueeze(-1) * Y[:,0:N-2,:] + \
-                        (G_l_ii[:,1:] * G_l_jj[:,:-1]).unsqueeze(-1) * Y[:,1:N-1,:] + \
-                        G_l_ij[:,1:].unsqueeze(-1) * Y[:,2:N,:])
-    
-        # Last row (i = N-1)
-        Z[:,N-1,:] = G_l_ji[:,N-2].unsqueeze(-1) * Y[:,N-2,:] + G_l_jj[:,N-2].unsqueeze(-1) * Y[:,N-1,:]
+        if (self.transform is True) and (self.M is not None):
+            X = X.reshape(B, N // self.M, self.M, D).transpose(1, 2).reshape(B, N, D)
+        elif (self.transform is False) and (Diag is not None):
+            X = torch.einsum('bn,bnd->bnd', Diag, X)
 
-        if (transform is True) and (Diag is not None):
+        Y[:, N-1, :] = G_u_ji[:, N-2].unsqueeze(-1) * X[:, N-2, :] + G_u_jj[:, N-2].unsqueeze(-1) * X[:, N-1, :]
+
+        Y[:, 1:-1, :] = G_u_ji[:, :N-2].unsqueeze(-1) * X[:, :-2, :] \
+                    + (G_u_jj[:, :N-2] * G_u_ii[:, 1:N-1]).unsqueeze(-1) * X[:, 1:-1, :] \
+                    + (G_u_jj[:, :N-2] * G_u_ij[:, 1:N-1]).unsqueeze(-1) * X[:, 2:, :]
+
+        Y[:, 0, :] = G_u_ii[:, 0].unsqueeze(-1) * X[:, 0, :] + G_u_ij[:, 0].unsqueeze(-1) * X[:, 1, :]
+
+        Z[:, 0, :] = G_l_ii[:, 0].unsqueeze(-1) * Y[:, 0, :] + G_l_ij[:, 0].unsqueeze(-1) * Y[:, 1, :]
+
+        Z[:, 1:N-1, :] = (G_l_ii[:, 1:N-1] * G_l_ji[:, 0:N-2]).unsqueeze(-1) * Y[:, :-2, :] \
+                    + (G_l_ii[:, 1:N-1] * G_l_jj[:, 0:N-2]).unsqueeze(-1) * Y[:, 1:-1, :] \
+                    + G_l_ij[:, 1:N-1].unsqueeze(-1) * Y[:, 2:, :]
+
+        Z[:, N-1, :] = G_l_ji[:, N-2].unsqueeze(-1) * Y[:, N-2, :] + G_l_jj[:, N-2].unsqueeze(-1) * Y[:, N-1, :]
+
+        if (self.transform is True) and (Diag is not None):
             Z = torch.einsum('bn,bnd->bnd', Diag, Z)
-        elif (transform is False) and (self.M is not None):
+        elif (self.transform is False) and (self.M is not None):
             Z = Z.reshape(B, self.M, N // self.M, D).transpose(1, 2).reshape(B, N, D)
 
         return Z
     
 
 class InverseDHHPTransform(nn.Module):
-    def __init__(self, permutation_dim: Optional[int] = None) -> None:
+    def __init__(self, transform: bool = False, permutation_dim: Optional[int] = None) -> None:
         super(InverseDHHPTransform, self).__init__()
-        self.inverse_dhhp_transform = DHHPTransform(permutation_dim)
+        self.inverse_dhhp_transform = DHHPTransform(transform, permutation_dim)
 
-    def forward(self, transform: bool, input: Tensor, G_l_ii_conj_trs: Tensor, G_l_ij_conj_trs: Tensor, G_l_ji_conj_trs: Tensor, G_l_jj_conj_trs: Tensor, \
+    def forward(self, X: Tensor, G_l_ii_conj_trs: Tensor, G_l_ij_conj_trs: Tensor, G_l_ji_conj_trs: Tensor, G_l_jj_conj_trs: Tensor, \
                 G_u_ii_conj_trs: Tensor, G_u_ij_conj_trs: Tensor, G_u_ji_conj_trs: Tensor, G_u_jj_conj_trs: Tensor, Diag_conj_trs: Optional[Tensor] = None):
-        return self.inverse_dhhp_transform(transform, input, G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs, \
-                                    G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs, Diag_conj_trs)
+        return self.inverse_dhhp_transform(X, G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs, \
+                                           G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs, Diag_conj_trs)
 
 
 class KernelPolynomial(nn.Module):
@@ -312,32 +305,28 @@ class Kernelution(nn.Module):
         seq_pool_dim = 2
         self.seq_eigenvalue = GenerateEigenvalue(feat_dim, seq_pool_dim, eigenvalue_drop_prob)
         self.seq_kernel_poly = KernelPolynomial(batch_size, kernel_type, max_order, mu, xi, stigma, heta)
-        self.givens_parameters = GenerateParameters(length, feat_dim, eigenvector_drop_prob)
-        self.Theta = nn.Parameter(torch.empty(batch_size, length))
+        self.givens_parameters = GenerateParameters(feat_dim, eigenvector_drop_prob)
         self.value_linear_real = nn.Linear(feat_dim, feat_dim, bias=False)
         self.value_linear_imag = nn.Linear(feat_dim, feat_dim, bias=False)
         # self.value_dropout = ComplexDropout(p=value_drop_prob)
         self.value_dropout = SeparateComplexDropout(p=value_drop_prob)
         if (permutation_dim is None) or (permutation_dim == 'none') or (permutation_dim == 0):
-            self.dhhp_transform = DHHPTransform()
-            self.inverse_dhhp_transform = InverseDHHPTransform()
-        else:
-            self.dhhp_transform = DHHPTransform(permutation_dim)
-            self.inverse_dhhp_transform = InverseDHHPTransform(permutation_dim)
+            permutation_dim = None
+        self.dhhp_transform = DHHPTransform(True, permutation_dim)
+        self.inverse_dhhp_transform = InverseDHHPTransform(False, permutation_dim)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         init.normal_(self.value_linear_real.weight, mean=0.0, std=math.sqrt(0.5))
         init.normal_(self.value_linear_imag.weight, mean=0.0, std=math.sqrt(0.5))
-        init.uniform_(self.Theta, a=0.0, b=2.0)
 
     def forward(self, input: Tensor) -> Tensor:
         # Hyperparameters for 1-DHHP
-        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u = self.givens_parameters(input)
+        Alpha_l, Beta_l, Gamma_l, Alpha_u, Beta_u, Gamma_u, Theta = self.givens_parameters(input)
         G_l_ii, G_l_ij, G_l_ji, G_l_jj, G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs = gengerate_dhhp_parameters(Alpha_l, Beta_l, Gamma_l)
         G_u_ii, G_u_ij, G_u_ji, G_u_jj, G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs = gengerate_dhhp_parameters(Alpha_u, Beta_u, Gamma_u)
-        Diag = torch.exp(1j * math.pi * self.Theta)
+        Diag = torch.exp(2j * math.pi * Theta)
         Diag_conj_trs = Diag.conj()
 
         # Eigenvalues
@@ -355,9 +344,9 @@ class Kernelution(nn.Module):
         value = self.value_dropout(value)
 
         # Kernerlution
-        unitary_conv_1d_forward = self.dhhp_transform(True, value, G_l_ii, G_l_ij, G_l_ji, G_l_jj, G_u_ii, G_u_ij, G_u_ji, G_u_jj, Diag)
+        unitary_conv_1d_forward = self.dhhp_transform(value, G_l_ii, G_l_ij, G_l_ji, G_l_jj, G_u_ii, G_u_ij, G_u_ji, G_u_jj, Diag)
         unitary_conv_1d = torch.einsum('bn,bnd->bnd', digraph_conv_eigenvalue, unitary_conv_1d_forward)
-        unitary_conv_1d_inverse = self.inverse_dhhp_transform(False, unitary_conv_1d, G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs, \
+        unitary_conv_1d_inverse = self.inverse_dhhp_transform(unitary_conv_1d, G_u_ii_conj_trs, G_u_ij_conj_trs, G_u_ji_conj_trs, G_u_jj_conj_trs, \
                                                             G_l_ii_conj_trs, G_l_ij_conj_trs, G_l_ji_conj_trs, G_l_jj_conj_trs, Diag_conj_trs)
         
         return unitary_conv_1d_inverse
