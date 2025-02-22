@@ -158,7 +158,7 @@ class DHHPTransform(nn.Module):
         elif (self.transform is False) and (Diag is not None):
             X = torch.einsum('bn,bnd->bnd', Diag, X)
 
-        Y[:, N-1, :] = G_u_ji[:, N-2].unsqueeze(-1) * X[:, N-2, :] + G_u_jj[:, N-2].unsqueeze(-1) * X[:, N-1, :]
+        Y[:, -1, :] = G_u_ji[:, N-2].unsqueeze(-1) * X[:, -2, :] + G_u_jj[:, N-2].unsqueeze(-1) * X[:, -1, :]
 
         Y[:, 1:-1, :] = G_u_ji[:, :N-2].unsqueeze(-1) * X[:, :-2, :] \
                     + (G_u_jj[:, :N-2] * G_u_ii[:, 1:N-1]).unsqueeze(-1) * X[:, 1:-1, :] \
@@ -168,11 +168,11 @@ class DHHPTransform(nn.Module):
 
         Z[:, 0, :] = G_l_ii[:, 0].unsqueeze(-1) * Y[:, 0, :] + G_l_ij[:, 0].unsqueeze(-1) * Y[:, 1, :]
 
-        Z[:, 1:N-1, :] = (G_l_ii[:, 1:N-1] * G_l_ji[:, 0:N-2]).unsqueeze(-1) * Y[:, :-2, :] \
+        Z[:, 1:-1, :] = (G_l_ii[:, 1:N-1] * G_l_ji[:, 0:N-2]).unsqueeze(-1) * Y[:, :-2, :] \
                     + (G_l_ii[:, 1:N-1] * G_l_jj[:, 0:N-2]).unsqueeze(-1) * Y[:, 1:-1, :] \
                     + G_l_ij[:, 1:N-1].unsqueeze(-1) * Y[:, 2:, :]
 
-        Z[:, N-1, :] = G_l_ji[:, N-2].unsqueeze(-1) * Y[:, N-2, :] + G_l_jj[:, N-2].unsqueeze(-1) * Y[:, N-1, :]
+        Z[:, -1, :] = G_l_ji[:, N-2].unsqueeze(-1) * Y[:, -2, :] + G_l_jj[:, N-2].unsqueeze(-1) * Y[:, -1, :]
 
         if (self.transform is True) and (Diag is not None):
             Z = torch.einsum('bn,bnd->bnd', Diag, Z)
