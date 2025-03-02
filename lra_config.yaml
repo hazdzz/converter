@@ -106,7 +106,7 @@ image:
   weight_decay: 0.001
   epochs: 30
   optimizer: "adamw" # "adamw", "nadamw", or "ademamix"
-  patience: 3
+  patience: 5
   num_workers: 2
   xformer:
     converter:

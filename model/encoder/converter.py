@@ -6,6 +6,7 @@ import torch.nn.init as init
 from torch import Tensor
 from typing import Optional, Union
 from .. import embedding, norm
+from utils.pscan import pscan
 
 
 def complex_fcaller(funtional_handle, *args):
@@ -150,29 +151,35 @@ class DHHPTransform(nn.Module):
     def forward(self, X: Tensor, G_l_ii: Tensor, G_l_ij: Tensor, G_l_ji: Tensor, G_l_jj: Tensor, \
                 G_u_ii: Tensor, G_u_ij: Tensor, G_u_ji: Tensor, G_u_jj: Tensor, Diag: Optional[Tensor] = None) -> Tensor:
         B, N, D = X.size()
-        Y = torch.zeros_like(X)
-        Z = torch.zeros_like(X)
 
         if (self.transform is True) and (self.M is not None):
             X = X.reshape(B, N // self.M, self.M, D).transpose(1, 2).reshape(B, N, D)
         elif (self.transform is False) and (Diag is not None):
             X = torch.einsum('bn,bnd->bnd', Diag, X)
 
-        Y[:, -1, :] = G_u_ji[:, N-2].unsqueeze(-1) * X[:, -2, :] + G_u_jj[:, N-2].unsqueeze(-1) * X[:, -1, :]
+        # Parallel Scan (Blelloch algorithm)
+        X_, Y = torch.zeros_like(X), torch.zeros_like(X)
+        X_[:, :-1, :] = G_u_ii.unsqueeze(-1) * X[:, :-1, :]
+        X_ = X_.flip(1)
+        G_u_ij = G_u_ij.flip(1)
+        G_u_ij = torch.cat([G_u_ij, torch.zeros_like(G_u_ij[:, :1])], dim=1)
+        P_u = torch.zeros_like(G_u_ij)
+        P_u[:, 1:] = G_u_ij[:, :-1].clone()
+        H_u_init = X_[:, 0, :].clone()
+        H_u = pscan(P_u, X_, H_u_init)
+        H_u = H_u.flip(1)
+        Y[:, 1:, :] = G_u_ji.unsqueeze(-1) * X[:, :-1, :] + G_u_jj.unsqueeze(-1) * H_u[:, 1:, :]
+        Y[:, 0, :] = H_u[:, 0, :]
 
-        Y[:, 1:-1, :] = G_u_ji[:, :N-2].unsqueeze(-1) * X[:, :-2, :] \
-                    + (G_u_jj[:, :N-2] * G_u_ii[:, 1:N-1]).unsqueeze(-1) * X[:, 1:-1, :] \
-                    + (G_u_jj[:, :N-2] * G_u_ij[:, 1:N-1]).unsqueeze(-1) * X[:, 2:, :]
-
-        Y[:, 0, :] = G_u_ii[:, 0].unsqueeze(-1) * X[:, 0, :] + G_u_ij[:, 0].unsqueeze(-1) * X[:, 1, :]
-
-        Z[:, 0, :] = G_l_ii[:, 0].unsqueeze(-1) * Y[:, 0, :] + G_l_ij[:, 0].unsqueeze(-1) * Y[:, 1, :]
-
-        Z[:, 1:-1, :] = (G_l_ii[:, 1:N-1] * G_l_ji[:, 0:N-2]).unsqueeze(-1) * Y[:, :-2, :] \
-                    + (G_l_ii[:, 1:N-1] * G_l_jj[:, 0:N-2]).unsqueeze(-1) * Y[:, 1:-1, :] \
-                    + G_l_ij[:, 1:N-1].unsqueeze(-1) * Y[:, 2:, :]
-
-        Z[:, -1, :] = G_l_ji[:, N-2].unsqueeze(-1) * Y[:, -2, :] + G_l_jj[:, N-2].unsqueeze(-1) * Y[:, -1, :]
+        Y_, Z = torch.zeros_like(Y), torch.zeros_like(Y)
+        Y_[:, 1:, :] = G_l_jj.unsqueeze(-1) * Y[:, 1:, :]
+        G_l_ji = torch.cat([G_l_ji, torch.zeros_like(G_l_ji[:, :1])], dim=1)
+        P_l = torch.zeros_like(G_l_ji)
+        P_l[:, 1:] = G_l_ji[:, :-1].clone()
+        H_l_init = Y_[:, 0, :].clone()
+        H_l = pscan(P_l, Y_, H_l_init)
+        Z[:, :-1, :] = G_l_ii.unsqueeze(-1) * H_l[:, :-1, :] + G_l_ij.unsqueeze(-1) * Y[:, 1:, :]
+        Z[:, N-1, :] = H_l[:, N-1, :]
 
         if (self.transform is True) and (Diag is not None):
             Z = torch.einsum('bn,bnd->bnd', Diag, Z)
