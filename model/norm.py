@@ -26,7 +26,7 @@ class FixNorm(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
-        fixnorm = input / (torch.norm(input, dim=-1, keepdim=True) + self.eps)
+        fixnorm = input / (torch.norm(input, p=2, dim=-1, keepdim=True) + self.eps)
 
         if self.bias is not None:
             fixnorm = fixnorm + self.bias
@@ -59,7 +59,7 @@ class ScaleNorm(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
-        scalenorm = self.weight * input / (torch.norm(input, dim=-1, keepdim=True) + self.eps)
+        scalenorm = self.weight * input / (torch.norm(input, p=2, dim=-1, keepdim=True) + self.eps)
 
         if self.bias is not None:
             scalenorm = scalenorm + self.bias
