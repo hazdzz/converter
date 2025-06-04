@@ -6,7 +6,7 @@ The official PyTorch implementation of Converter proposed by our paper *Converti
 ## Citation
 ```
 @misc{zhang2025converter,
-    author  = {Zhang, Jie and Mao-Hsuan Mao and Chiu, Bo-Wei and Sun, Min-Te},
+    author  = {Jie Zhang and Mao-Hsuan Mao and Bo-Wei Chiu and Min-Te Sun},
     title   = {Converting Transformers into DGNNs Form},
     year    = {2025}
 }
